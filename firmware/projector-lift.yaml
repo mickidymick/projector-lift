@@ -1,0 +1,852 @@
+# ESPHome firmware — porch projector lift box
+# Wiring + state-machine reference: ../index.html (rendered:
+# https://mickidymick.github.io/projector-lift/) — §9 wiring sketch · §10
+# firmware target · §12 AV chain (Telnet + PJLink) · §13 Alexa integration
+#
+# PIN MAP (matches §9 as-built GPIO map):
+#   GPIO25  RPWM  → BTS7960 #1 + #2 RPWM (retract / close, tied)
+#   GPIO26  LPWM  → BTS7960 #1 + #2 LPWM (extend  / open,  tied)
+#   GPIO27  → BTS7960 #1 R_EN + L_EN (independent enable · actuator A)
+#   GPIO19  → BTS7960 #2 R_EN + L_EN (independent enable · actuator B)
+#   GPIO32  ← BTS7960 #1 R_IS (ADC1_4) actuator A extend current
+#   GPIO33  ← BTS7960 #1 L_IS (ADC1_5) actuator A retract current
+#   GPIO34  ← BTS7960 #2 R_IS (ADC1_6) actuator B extend current
+#   GPIO35  ← BTS7960 #2 L_IS (ADC1_7) actuator B retract current
+#   GPIO17  → P55NF06L gate via 220 Ω (low-side fan PWM, 6.5 V rail)
+#   GPIO16  → 1 kΩ → BC547 base → F-1001 coil (screen drop)
+#   GPIO18  ← wall button (switch-to-GND, internal pull-up)
+#   GPIO23  ← Prusa endstop A SIG (slide A, NO-to-GND, INPUT_PULLUP)
+#   GPIO22  ← Prusa endstop B SIG (slide B, NO-to-GND, INPUT_PULLUP)
+#
+# Endstops are the primary end-of-travel signal for OPENING. When endstop A
+# trips, GPIO27 drops LOW so BTS #1 goes hi-Z and actuator A stops; actuator B
+# keeps moving until endstop B fires. Current-sense survives as the EOT signal
+# for CLOSING (no endstop at the retract end — PA-04 internal limit + current
+# collapse handles it) and as the stall-detect overlay for both directions.
+#
+# Network reach (§12): on lift state change the firmware sends Telnet mode
+# commands to the Denon AVR (port 23) and PJLink power commands to the Epson
+# projector (port 4352). AVR persists settings across standby, so Apple TV's
+# CEC wake reads the current config.
+
+substitutions:
+  name: projector-lift
+  friendly: "Projector Lift"
+
+  # Static endpoints — edit to match your DHCP reservations.
+  avr_ip: "192.168.1.50"        # Denon AVR-X2800H · Telnet :23
+  projector_ip: "192.168.1.51"  # Epson PowerLite L730U · PJLink :4352
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly}
+  includes:
+    - includes.h
+  on_boot:
+    # Pull every output to a known-safe state before WiFi is up.
+    - priority: -100
+      then:
+        - script.execute: enter_closed
+    # Once the network is up, reconcile AVR + projector to current state.
+    - priority: -200
+      then:
+        - script.execute: boot_reconcile
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+logger:
+  baud_rate: 115200
+  level: INFO
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "${name}-setup"
+    password: !secret ap_password
+captive_portal:
+
+api:
+  encryption:
+    key: !secret api_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+# ===========================================================================
+# Tunables — HA Number entities so calibration doesn't need a re-flash.
+# PLACEHOLDER entries are marked; measure real values on the bench (see README)
+# before trusting auto-stop on current sense.
+# ===========================================================================
+number:
+  - platform: template
+    name: "Cooldown duration"
+    id: cooldown_min
+    min_value: 1
+    max_value: 60
+    step: 1
+    initial_value: 30
+    restore_value: true
+    optimistic: true
+    unit_of_measurement: min
+
+  - platform: template
+    name: "PWM ramp duration"
+    id: ramp_ms
+    min_value: 100
+    max_value: 2000
+    step: 50
+    initial_value: 500
+    restore_value: true
+    optimistic: true
+    unit_of_measurement: ms
+
+  - platform: template
+    name: "Cruise duty"
+    id: cruise_pct
+    min_value: 30
+    max_value: 100
+    step: 5
+    initial_value: 100
+    restore_value: true
+    optimistic: true
+    unit_of_measurement: "%"
+
+  - platform: template
+    name: "Fan running duty"
+    id: fan_running_pct
+    min_value: 30
+    max_value: 100
+    step: 5
+    initial_value: 100
+    restore_value: true
+    optimistic: true
+    unit_of_measurement: "%"
+
+  - platform: template
+    name: "Fan cooldown duty"
+    id: fan_cooldown_pct
+    min_value: 20
+    max_value: 100
+    step: 5
+    initial_value: 50
+    restore_value: true
+    optimistic: true
+    unit_of_measurement: "%"
+
+  - platform: template
+    name: "Stall threshold (PLACEHOLDER — calibrate)"
+    id: stall_v
+    min_value: 0.20
+    max_value: 3.30
+    step: 0.05
+    initial_value: 2.00
+    restore_value: true
+    optimistic: true
+    unit_of_measurement: V
+
+  - platform: template
+    name: "End-of-travel threshold (PLACEHOLDER — calibrate)"
+    id: eot_v
+    min_value: 0.00
+    max_value: 1.50
+    step: 0.01
+    initial_value: 0.10
+    restore_value: true
+    optimistic: true
+    unit_of_measurement: V
+
+  - platform: template
+    name: "Screen post-close delay"
+    id: screen_delay_s
+    min_value: 0
+    max_value: 10
+    step: 0.5
+    initial_value: 3
+    restore_value: true
+    optimistic: true
+    unit_of_measurement: s
+
+  - platform: template
+    name: "Travel safety timeout"
+    id: travel_timeout_s
+    min_value: 5
+    max_value: 60
+    step: 1
+    initial_value: 15
+    restore_value: true
+    optimistic: true
+    unit_of_measurement: s
+
+globals:
+  # 0=CLOSED 1=OPENING 2=OPEN 3=CLOSING 4=COOLDOWN 5=FAULT
+  - id: lift_state
+    type: int
+    initial_value: '0'
+  # Last observed AVR VSMONI? response: -1 unknown · 1 MONI1 · 2 MONI2 · 3 AUTO
+  - id: avr_monitor_state
+    type: int
+    initial_value: '-1'
+
+# ===========================================================================
+# PWM outputs — LEDC at 20 kHz (above hearing) for motors; fan PWM at 25 kHz
+# to keep MOSFET switching losses sane while staying inaudible. monochromatic
+# light wrappers give free soft-ramping; gamma_correct: 1.0 keeps the duty
+# curve linear (default 2.8 would non-linearly distort it).
+# ===========================================================================
+output:
+  - platform: ledc
+    pin: GPIO25
+    id: rpwm_raw
+    frequency: 20000Hz
+  - platform: ledc
+    pin: GPIO26
+    id: lpwm_raw
+    frequency: 20000Hz
+  - platform: ledc
+    pin: GPIO17
+    id: fan_pwm_raw
+    frequency: 25000Hz
+
+light:
+  - platform: monochromatic
+    output: rpwm_raw
+    id: rpwm
+    internal: true
+    gamma_correct: 1.0
+    default_transition_length: 0s
+  - platform: monochromatic
+    output: lpwm_raw
+    id: lpwm
+    internal: true
+    gamma_correct: 1.0
+    default_transition_length: 0s
+  - platform: monochromatic
+    output: fan_pwm_raw
+    id: fan_pwm
+    internal: true
+    gamma_correct: 1.0
+    default_transition_length: 0s
+
+# ===========================================================================
+# Discrete outputs
+#   screen_relay — BC547 base drive · HIGH closes the F-1001 contact
+#   bts_a_enable / bts_b_enable — BTS7960 R_EN + L_EN (one per actuator)
+#       HIGH = BTS module active · LOW = outputs hi-Z (motor coasts)
+#       Held LOW at rest so a glitch on PWM can't move the motors.
+# ===========================================================================
+switch:
+  - platform: gpio
+    pin: GPIO16
+    id: screen_relay
+    name: "Screen relay"
+    restore_mode: ALWAYS_OFF
+    icon: mdi:projector-screen
+
+  - platform: gpio
+    pin: GPIO27
+    id: bts_a_enable
+    name: "BTS A enable"
+    restore_mode: ALWAYS_OFF
+    internal: true
+
+  - platform: gpio
+    pin: GPIO19
+    id: bts_b_enable
+    name: "BTS B enable"
+    restore_mode: ALWAYS_OFF
+    internal: true
+
+  # Alexa-friendly power surface: "Alexa, turn on/off the projector".
+  # HA's Alexa bridge maps this to PowerController; the cover entity below
+  # stays around for HA's UI semantics (open/close).
+  - platform: template
+    name: "Projector"
+    id: projector_switch
+    icon: mdi:projector
+    optimistic: false
+    lambda: |-
+      int s = id(lift_state);
+      return s == 1 || s == 2;
+    turn_on_action:
+      - lambda: |-
+          int s = id(lift_state);
+          if (s == 0) {
+            id(open_lift).execute();
+          } else if (s == 4) {
+            id(cooldown_timer).stop();
+            id(open_lift).execute();
+          }
+    turn_off_action:
+      - lambda: |-
+          if (id(lift_state) == 2) id(close_lift).execute();
+
+# ===========================================================================
+# Inputs — wall button + two endstops. All three are NO switch-to-GND with
+# INPUT_PULLUP enabled; `inverted: true` so "active" reads as "pressed/tripped".
+# ===========================================================================
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO18
+      mode: INPUT_PULLUP
+      inverted: true
+    id: wall_button
+    name: "Wall button"
+    filters:
+      - delayed_on: 30ms
+      - delayed_off: 30ms
+    on_press:
+      then:
+        - lambda: |-
+            int s = id(lift_state);
+            ESP_LOGI("lift", "button pressed (state=%d)", s);
+            if (s == 0) {
+              id(open_lift).execute();
+            } else if (s == 2) {
+              id(close_lift).execute();
+            } else if (s == 4) {
+              ESP_LOGI("lift", "canceling cooldown");
+              id(cooldown_timer).stop();
+              id(open_lift).execute();
+            }
+            // OPENING / CLOSING / FAULT: ignore — let motion finish or
+            // require a manual reset via the diag button.
+
+  - platform: gpio
+    pin:
+      number: GPIO23
+      mode: INPUT_PULLUP
+      inverted: true
+    id: endstop_a
+    name: "Endstop A"
+    filters:
+      - delayed_on: 10ms
+      - delayed_off: 10ms
+    on_press:
+      then:
+        - lambda: |-
+            ESP_LOGI("lift", "endstop A tripped (state=%d)", id(lift_state));
+            if (id(lift_state) == 1) {
+              // Drop BTS #1 → actuator A coasts to stop while B keeps moving.
+              id(bts_a_enable).turn_off();
+            }
+
+  - platform: gpio
+    pin:
+      number: GPIO22
+      mode: INPUT_PULLUP
+      inverted: true
+    id: endstop_b
+    name: "Endstop B"
+    filters:
+      - delayed_on: 10ms
+      - delayed_off: 10ms
+    on_press:
+      then:
+        - lambda: |-
+            ESP_LOGI("lift", "endstop B tripped (state=%d)", id(lift_state));
+            if (id(lift_state) == 1) {
+              id(bts_b_enable).turn_off();
+            }
+
+sensor:
+  - platform: adc
+    pin: GPIO32
+    id: a_ris
+    name: "Actuator A R_IS"
+    update_interval: 50ms
+    attenuation: 12db
+    accuracy_decimals: 3
+    unit_of_measurement: V
+    filters:
+      - sliding_window_moving_average: { window_size: 3, send_every: 1 }
+  - platform: adc
+    pin: GPIO33
+    id: a_lis
+    name: "Actuator A L_IS"
+    update_interval: 50ms
+    attenuation: 12db
+    accuracy_decimals: 3
+    unit_of_measurement: V
+    filters:
+      - sliding_window_moving_average: { window_size: 3, send_every: 1 }
+  - platform: adc
+    pin: GPIO34
+    id: b_ris
+    name: "Actuator B R_IS"
+    update_interval: 50ms
+    attenuation: 12db
+    accuracy_decimals: 3
+    unit_of_measurement: V
+    filters:
+      - sliding_window_moving_average: { window_size: 3, send_every: 1 }
+  - platform: adc
+    pin: GPIO35
+    id: b_lis
+    name: "Actuator B L_IS"
+    update_interval: 50ms
+    attenuation: 12db
+    accuracy_decimals: 3
+    unit_of_measurement: V
+    filters:
+      - sliding_window_moving_average: { window_size: 3, send_every: 1 }
+
+text_sensor:
+  - platform: template
+    name: "Lift state"
+    id: lift_state_str
+    update_interval: 1s
+    lambda: |-
+      switch (id(lift_state)) {
+        case 0: return {"CLOSED"};
+        case 1: return {"OPENING"};
+        case 2: return {"OPEN"};
+        case 3: return {"CLOSING"};
+        case 4: return {"COOLDOWN"};
+        case 5: return {"FAULT"};
+        default: return {"UNKNOWN"};
+      }
+
+  - platform: template
+    name: "AVR monitor mode"
+    id: avr_monitor_str
+    update_interval: 5s
+    lambda: |-
+      switch (id(avr_monitor_state)) {
+        case 1: return {"MONI1"};
+        case 2: return {"MONI2"};
+        case 3: return {"AUTO"};
+        default: return {"unknown"};
+      }
+
+# ===========================================================================
+# HA cover entity — gives HA + Alexa standard up/down semantics
+# ===========================================================================
+cover:
+  - platform: template
+    name: "Projector lift"
+    id: lift_cover
+    device_class: shutter
+    optimistic: true
+    assumed_state: true
+    open_action:
+      - lambda: |-
+          int s = id(lift_state);
+          if (s == 0) id(open_lift).execute();
+          else if (s == 4) {
+            id(cooldown_timer).stop();
+            id(open_lift).execute();
+          }
+    close_action:
+      - lambda: |-
+          if (id(lift_state) == 2) id(close_lift).execute();
+    stop_action:
+      - script.execute: emergency_stop
+
+# ===========================================================================
+# Periodic AVR state polling — exposes monitor mode to HA while OPEN so HA
+# can decide when to fire BOTH-mode commands. Detecting "Sony TV just woke"
+# reliably from the AVR alone isn't possible on the X2800H without testing;
+# the polling skeleton is here so HA automations have something to react to.
+# ===========================================================================
+interval:
+  - interval: 5s
+    then:
+      - if:
+          condition:
+            lambda: return id(lift_state) == 2;
+          then:
+            - script.execute: avr_query_monitor
+
+# ===========================================================================
+# Scripts — state transitions + network clients
+# ===========================================================================
+script:
+  # ---- Idle / safety -----------------------------------------------------
+  - id: enter_closed
+    then:
+      - light.turn_off: { id: rpwm,    transition_length: 0s }
+      - light.turn_off: { id: lpwm,    transition_length: 0s }
+      - light.turn_off: { id: fan_pwm, transition_length: 0s }
+      - switch.turn_off: bts_a_enable
+      - switch.turn_off: bts_b_enable
+      - switch.turn_off: screen_relay
+      - lambda: id(lift_state) = 0;
+      - logger.log: "→ CLOSED"
+
+  - id: emergency_stop
+    then:
+      # Halt any in-flight motion script first — otherwise its delays /
+      # wait_until would resume and contend with our shutdown.
+      - script.stop: open_lift
+      - script.stop: close_lift
+      - light.turn_off: { id: rpwm, transition_length: 100ms }
+      - light.turn_off: { id: lpwm, transition_length: 100ms }
+      - switch.turn_off: bts_a_enable
+      - switch.turn_off: bts_b_enable
+      - lambda: id(lift_state) = 5;
+      - logger.log:
+          format: "EMERGENCY STOP (state=FAULT) — run 'Diag: reset to CLOSED' to recover"
+          level: WARN
+
+  # ---- OPEN sequence -----------------------------------------------------
+  # Order matters: PJLink first (projector warm-up takes ~30 s in parallel),
+  # then AVR routes to OUTDOOR mode (so the audio chain is ready), then we
+  # drop the screen, kick fans, and ramp the actuators up.
+  - id: open_lift
+    mode: restart
+    then:
+      # Mutual-exclude with close_lift — without this an in-flight CLOSING
+      # would keep ramping RPWM after we set state=OPENING.
+      - script.stop: close_lift
+      - lambda: id(lift_state) = 1;
+      - logger.log: "→ OPENING"
+      - script.execute: projector_power_on
+      - script.execute: avr_outdoor
+      - switch.turn_on: screen_relay
+      - light.turn_on:
+          id: fan_pwm
+          brightness: !lambda return id(fan_running_pct).state / 100.0;
+          transition_length: 200ms
+      - light.turn_off: { id: rpwm, transition_length: 0s }
+      - delay: 50ms                                              # deadtime
+      - switch.turn_on: bts_a_enable
+      - switch.turn_on: bts_b_enable
+      - light.turn_on:
+          id: lpwm
+          brightness: !lambda return id(cruise_pct).state / 100.0;
+          transition_length: !lambda return id(ramp_ms).state;
+      # Hold off EOT/stall checks until ramp completes + 250 ms current settle.
+      - delay: !lambda return id(ramp_ms).state + 250;
+      - wait_until:
+          condition:
+            lambda: |-
+              float stl = id(stall_v).state;
+              float al  = id(a_lis).state;
+              float bl  = id(b_lis).state;
+              // Stall (rare with endstops) — bail out to the reverse handler.
+              if (al > stl || bl > stl) {
+                ESP_LOGW("lift", "STALL extending: A_L=%.2fV B_L=%.2fV", al, bl);
+                id(stall_during_extend).execute();
+                return true;
+              }
+              // Primary EOT: both endstops tripped — bts_a_enable /
+              // bts_b_enable were already dropped by their on_press handlers.
+              return id(endstop_a).state && id(endstop_b).state;
+          timeout: !lambda return (uint32_t)(id(travel_timeout_s).state * 1000);
+      - light.turn_off:
+          id: lpwm
+          transition_length: !lambda return id(ramp_ms).state;
+      - switch.turn_off: bts_a_enable
+      - switch.turn_off: bts_b_enable
+      - lambda: |-
+          if (id(lift_state) == 1) {
+            id(lift_state) = 2;
+            ESP_LOGI("lift", "→ OPEN");
+          }
+
+  # ---- CLOSE sequence ----------------------------------------------------
+  # PJLink OFF starts the projector's internal cooldown. AVR returns to
+  # INDOOR mode now (per §12 spec); in the expected user flow Apple TV is
+  # already powered down so Zone 2 is silent — there's no audio to cut.
+  # Stall during retract = unknown jam → latch FAULT, no auto-reverse.
+  - id: close_lift
+    mode: restart
+    then:
+      - script.stop: open_lift
+      - lambda: id(lift_state) = 3;
+      - logger.log: "→ CLOSING"
+      - script.execute: projector_power_off
+      - script.execute: avr_indoor
+      - light.turn_off: { id: lpwm, transition_length: 0s }
+      - delay: 50ms                                              # deadtime
+      - switch.turn_on: bts_a_enable
+      - switch.turn_on: bts_b_enable
+      - light.turn_on:
+          id: rpwm
+          brightness: !lambda return id(cruise_pct).state / 100.0;
+          transition_length: !lambda return id(ramp_ms).state;
+      - delay: !lambda return id(ramp_ms).state + 250;
+      - wait_until:
+          condition:
+            lambda: |-
+              float eot = id(eot_v).state;
+              float stl = id(stall_v).state;
+              float ar  = id(a_ris).state;
+              float br  = id(b_ris).state;
+              if (ar > stl || br > stl) {
+                ESP_LOGE("lift", "STALL retracting: A_R=%.2fV B_R=%.2fV — manual recovery", ar, br);
+                id(lift_state) = 5;
+                return true;
+              }
+              return (ar < eot && br < eot);
+          timeout: !lambda return (uint32_t)(id(travel_timeout_s).state * 1000);
+      - light.turn_off:
+          id: rpwm
+          transition_length: !lambda return id(ramp_ms).state;
+      - switch.turn_off: bts_a_enable
+      - switch.turn_off: bts_b_enable
+      - lambda: |-
+          if (id(lift_state) == 3) {
+            id(lift_state) = 4;
+            ESP_LOGI("lift", "→ COOLDOWN");
+          } else {
+            return;  // FAULT — skip screen retract + cooldown
+          }
+      - if:
+          condition:
+            lambda: return id(lift_state) == 4;
+          then:
+            - delay: !lambda return (uint32_t)(id(screen_delay_s).state * 1000);
+            - switch.turn_off: screen_relay
+            # Step fan down to the lower cooldown duty for the long dwell.
+            - light.turn_on:
+                id: fan_pwm
+                brightness: !lambda return id(fan_cooldown_pct).state / 100.0;
+                transition_length: 1s
+            - script.execute: cooldown_timer
+
+  - id: cooldown_timer
+    mode: restart
+    then:
+      - delay: !lambda return (uint32_t)(id(cooldown_min).state * 60.0 * 1000.0);
+      - light.turn_off: { id: fan_pwm, transition_length: 1s }
+      - lambda: |-
+          id(lift_state) = 0;
+          ESP_LOGI("lift", "cooldown done → CLOSED");
+
+  # Stall during extend = obstruction below ⇒ back off briefly to clear it,
+  # then drop into FAULT for human attention rather than blindly continuing.
+  # ENs forced back ON because one side's endstop may have already tripped.
+  - id: stall_during_extend
+    then:
+      - logger.log:
+          format: "stall during extend — reversing 1.5s then FAULT"
+          level: WARN
+      - light.turn_off: { id: lpwm, transition_length: 100ms }
+      - delay: 200ms
+      - switch.turn_on: bts_a_enable
+      - switch.turn_on: bts_b_enable
+      - light.turn_on: { id: rpwm, brightness: 0.7, transition_length: 100ms }
+      - delay: 1500ms
+      - light.turn_off: { id: rpwm, transition_length: 200ms }
+      - delay: 300ms
+      - switch.turn_off: bts_a_enable
+      - switch.turn_off: bts_b_enable
+      - switch.turn_off: screen_relay
+      - lambda: |-
+          id(lift_state) = 5;
+          ESP_LOGW("lift", "→ FAULT (post-stall back-off)");
+
+  # ---- Boot reconciliation ----------------------------------------------
+  # Wait for WiFi before bothering the AVR/projector. Default to INDOOR mode
+  # (we boot CLOSED) and ask the projector its power state so HA can see it.
+  # Skip avr_indoor if the user already pressed the wall button before WiFi
+  # came up — open_lift's avr_outdoor would have failed silently then, but
+  # blindly overwriting it with INDOOR here would leave the AVR wrong while
+  # the box is OPEN.
+  - id: boot_reconcile
+    then:
+      - wait_until:
+          condition:
+            wifi.connected:
+          timeout: 30s
+      - delay: 1s
+      - if:
+          condition:
+            lambda: return id(lift_state) == 0;
+          then:
+            - script.execute: avr_indoor
+      - script.execute: projector_query_state
+
+  # ===========================================================================
+  # AVR Telnet client — Denon AVR-X2800H, port 23. Commands are ASCII,
+  # CR-terminated. Each script opens a fresh TCP connection so a network blip
+  # doesn't leave a stale socket pinned to the AVR. Sockets are POSIX/lwip
+  # via the helpers in includes.h — works in both Arduino and ESP-IDF builds.
+  # ===========================================================================
+  - id: avr_indoor
+    then:
+      - lambda: |-
+          int s = tcp_connect("${avr_ip}", 23, 500);
+          if (s < 0) {
+            ESP_LOGW("avr", "indoor: connect fail");
+            return;
+          }
+          const char *cmd = "VSMONI1\rMUOFF\rZ2OFF\r";
+          tcp_send(s, cmd, strlen(cmd));
+          ::close(s);
+          ESP_LOGI("avr", "→ INDOOR (VSMONI1 / MUOFF / Z2OFF)");
+
+  - id: avr_outdoor
+    then:
+      - lambda: |-
+          int s = tcp_connect("${avr_ip}", 23, 500);
+          if (s < 0) {
+            ESP_LOGW("avr", "outdoor: connect fail");
+            return;
+          }
+          const char *cmd = "VSMONI2\rMUON\rZ2SOURCE\rZ2ON\r";
+          tcp_send(s, cmd, strlen(cmd));
+          ::close(s);
+          ESP_LOGI("avr", "→ OUTDOOR (VSMONI2 / MUON / Z2SOURCE / Z2ON)");
+
+  - id: avr_both
+    then:
+      - lambda: |-
+          int s = tcp_connect("${avr_ip}", 23, 500);
+          if (s < 0) {
+            ESP_LOGW("avr", "both: connect fail");
+            return;
+          }
+          const char *cmd = "VSMONIAUTO\rMUOFF\rZ2SOURCE\rZ2ON\r";
+          tcp_send(s, cmd, strlen(cmd));
+          ::close(s);
+          ESP_LOGI("avr", "→ BOTH (VSMONIAUTO / MUOFF / Z2SOURCE / Z2ON)");
+
+  - id: avr_query_monitor
+    then:
+      - lambda: |-
+          int s = tcp_connect("${avr_ip}", 23, 300);
+          if (s < 0) return;
+          // Denon "VS" family uses a space before `?` for queries. If the
+          // AVR returns nothing on first test, try "VSMONI?" without the
+          // space — some firmware revisions accept either form.
+          const char *q = "VSMONI ?\r";
+          tcp_send(s, q, strlen(q));
+          std::string resp;
+          tcp_read_until_cr(s, resp, 300);
+          ::close(s);
+          int mode = -1;
+          if      (resp.find("VSMONIAUTO") != std::string::npos) mode = 3;
+          else if (resp.find("VSMONI2")    != std::string::npos) mode = 2;
+          else if (resp.find("VSMONI1")    != std::string::npos) mode = 1;
+          id(avr_monitor_state) = mode;
+          ESP_LOGD("avr", "VSMONI? → %d", mode);
+
+  # ===========================================================================
+  # PJLink client — Epson L730U, port 4352. Class 1, ASCII, CR-terminated.
+  # Assumes PJLink auth is disabled on the projector (Menu → Network →
+  # PJLink → Authentication: OFF). If auth is enabled later, prefix the
+  # command with the MD5 of (seed + password) per the PJLink spec.
+  # ===========================================================================
+  - id: projector_power_on
+    then:
+      - lambda: |-
+          int s = tcp_connect("${projector_ip}", 4352, 500);
+          if (s < 0) {
+            ESP_LOGW("pjlink", "power_on: connect fail");
+            return;
+          }
+          std::string greet;
+          tcp_read_until_cr(s, greet, 500);
+          if (greet.find("PJLINK 0") == std::string::npos) {
+            ESP_LOGW("pjlink", "no PJLINK 0 greeting (auth on?): %s", greet.c_str());
+            ::close(s);
+            return;
+          }
+          const char *cmd = "%1POWR 1\r";
+          tcp_send(s, cmd, strlen(cmd));
+          ::close(s);
+          ESP_LOGI("pjlink", "→ POWR 1");
+
+  - id: projector_power_off
+    then:
+      - lambda: |-
+          int s = tcp_connect("${projector_ip}", 4352, 500);
+          if (s < 0) {
+            ESP_LOGW("pjlink", "power_off: connect fail");
+            return;
+          }
+          std::string greet;
+          tcp_read_until_cr(s, greet, 500);
+          if (greet.find("PJLINK 0") == std::string::npos) {
+            ESP_LOGW("pjlink", "no PJLINK 0 greeting (auth on?): %s", greet.c_str());
+            ::close(s);
+            return;
+          }
+          const char *cmd = "%1POWR 0\r";
+          tcp_send(s, cmd, strlen(cmd));
+          ::close(s);
+          ESP_LOGI("pjlink", "→ POWR 0");
+
+  - id: projector_query_state
+    then:
+      - lambda: |-
+          int s = tcp_connect("${projector_ip}", 4352, 500);
+          if (s < 0) return;
+          std::string greet;
+          tcp_read_until_cr(s, greet, 500);
+          if (greet.find("PJLINK 0") == std::string::npos) {
+            ::close(s);
+            return;
+          }
+          const char *q = "%1POWR ?\r";
+          tcp_send(s, q, strlen(q));
+          std::string resp;
+          tcp_read_until_cr(s, resp, 500);
+          ::close(s);
+          ESP_LOGI("pjlink", "POWR? → %s", resp.c_str());
+
+# ===========================================================================
+# Diagnostic buttons — bench bring-up + manual mode triggers
+# ===========================================================================
+button:
+  - platform: template
+    name: "Diag: jog extend 500ms"
+    on_press:
+      - light.turn_off: { id: rpwm, transition_length: 0s }
+      - delay: 50ms
+      - switch.turn_on: bts_a_enable
+      - switch.turn_on: bts_b_enable
+      - light.turn_on: { id: lpwm, brightness: 0.6, transition_length: 100ms }
+      - delay: 500ms
+      - light.turn_off: { id: lpwm, transition_length: 100ms }
+      - delay: 100ms
+      - switch.turn_off: bts_a_enable
+      - switch.turn_off: bts_b_enable
+
+  - platform: template
+    name: "Diag: jog retract 500ms"
+    on_press:
+      - light.turn_off: { id: lpwm, transition_length: 0s }
+      - delay: 50ms
+      - switch.turn_on: bts_a_enable
+      - switch.turn_on: bts_b_enable
+      - light.turn_on: { id: rpwm, brightness: 0.6, transition_length: 100ms }
+      - delay: 500ms
+      - light.turn_off: { id: rpwm, transition_length: 100ms }
+      - delay: 100ms
+      - switch.turn_off: bts_a_enable
+      - switch.turn_off: bts_b_enable
+
+  - platform: template
+    name: "Diag: reset to CLOSED"
+    on_press:
+      - script.execute: enter_closed
+
+  - platform: template
+    name: "Diag: AVR → INDOOR"
+    on_press:
+      - script.execute: avr_indoor
+  - platform: template
+    name: "Diag: AVR → OUTDOOR"
+    on_press:
+      - script.execute: avr_outdoor
+  - platform: template
+    name: "Diag: AVR → BOTH"
+    on_press:
+      - script.execute: avr_both
+  - platform: template
+    name: "Diag: Projector POWR 1"
+    on_press:
+      - script.execute: projector_power_on
+  - platform: template
+    name: "Diag: Projector POWR 0"
+    on_press:
+      - script.execute: projector_power_off
