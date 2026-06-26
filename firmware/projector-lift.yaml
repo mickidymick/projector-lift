@@ -8,21 +8,32 @@
 #   GPIO26  LPWM  → BTS7960 #1 + #2 LPWM (extend  / open,  tied)
 #   GPIO27  → BTS7960 #1 R_EN + L_EN (independent enable · actuator A)
 #   GPIO19  → BTS7960 #2 R_EN + L_EN (independent enable · actuator B)
-#   GPIO32  ← BTS7960 #1 R_IS (ADC1_4) actuator A extend current
-#   GPIO33  ← BTS7960 #1 L_IS (ADC1_5) actuator A retract current
-#   GPIO34  ← BTS7960 #2 R_IS (ADC1_6) actuator B extend current
-#   GPIO35  ← BTS7960 #2 L_IS (ADC1_7) actuator B retract current
-#   GPIO17  → P55NF06L gate via 220 Ω (low-side fan PWM, 6.5 V rail)
+#   GPIO32  ← BTS7960 #1 R_IS (ADC1_4) actuator A retract (close) current
+#   GPIO33  ← BTS7960 #1 L_IS (ADC1_5) actuator A extend  (open)  current
+#   GPIO34  ← BTS7960 #2 R_IS (ADC1_6) actuator B retract (close) current
+#   GPIO35  ← BTS7960 #2 L_IS (ADC1_7) actuator B extend  (open)  current
+#   GPIO17  → IRLZ44N gate via 220 Ω (low-side fan PWM, 6.5 V rail)
 #   GPIO16  → 1 kΩ → BC547 base → F-1001 coil (screen drop)
-#   GPIO18  ← wall button (switch-to-GND, internal pull-up)
-#   GPIO23  ← Prusa endstop A SIG (slide A, NO-to-GND, INPUT_PULLUP)
-#   GPIO22  ← Prusa endstop B SIG (slide B, NO-to-GND, INPUT_PULLUP)
+#   GPIO18  ← wall button (Leviton 5655-2 momentary Decora, switch-to-GND, INPUT_PULLUP)
+#   GPIO23  ← Prusa endstop A SIG (deployed-end, NO-to-GND, INPUT_PULLUP)
+#   GPIO22  ← Prusa endstop B SIG (deployed-end, NO-to-GND, INPUT_PULLUP)
 #
-# Endstops are the primary end-of-travel signal for OPENING. When endstop A
+# CONTROL MODEL — single momentary button, endstop-driven dispatch:
+#   both endstops tripped   ⇒ button press triggers CLOSE (retract)
+#   either endstop not yet  ⇒ button press triggers OPEN  (extend)
+# Pressing mid-motion is fine — open_lift is mode:restart and stops close_lift
+# first, so a press during CLOSING reverses cleanly to OPENING. Pressing during
+# COOLDOWN cancels the timer and reopens. FAULT requires manual Diag reset.
+#
+# Endstops are the primary end-of-travel signal for OPENING. Each endstop is
+# mounted on the main box wall at the user-chosen deployed position; a bracket
+# on the top of the inner box trips them as the box descends. When endstop A
 # trips, GPIO27 drops LOW so BTS #1 goes hi-Z and actuator A stops; actuator B
-# keeps moving until endstop B fires. Current-sense survives as the EOT signal
-# for CLOSING (no endstop at the retract end — PA-04 internal limit + current
-# collapse handles it) and as the stall-detect overlay for both directions.
+# keeps moving until endstop B fires. Current-sense provides the EOT signal
+# for CLOSING (no endstop at the retract end — PA-04 internal limit opens the
+# motor circuit and the IS-pin voltage collapses to ~0). The high end of the
+# IS range saturates the ADC at the on-module 10 kΩ pulldown, but the low end
+# is fully readable, so "current dropped to zero" is a clean binary signal.
 #
 # Network reach (§12): on lift state change the firmware sends Telnet mode
 # commands to the Denon AVR (port 23) and PJLink power commands to the Epson
@@ -137,17 +148,6 @@ number:
     restore_value: true
     optimistic: true
     unit_of_measurement: "%"
-
-  - platform: template
-    name: "Stall threshold (PLACEHOLDER — calibrate)"
-    id: stall_v
-    min_value: 0.20
-    max_value: 3.30
-    step: 0.05
-    initial_value: 2.00
-    restore_value: true
-    optimistic: true
-    unit_of_measurement: V
 
   - platform: template
     name: "End-of-travel threshold (PLACEHOLDER — calibrate)"
@@ -300,31 +300,31 @@ binary_sensor:
     filters:
       - delayed_on: 30ms
       - delayed_off: 30ms
-    # Maintained-toggle switch: GPIO LOW = switch in ON position = lift OPEN,
-    # GPIO HIGH = switch OFF = lift CLOSED. Each edge fires one transition.
-    # OPENING / CLOSING / FAULT mid-motion: ignore — let current motion finish.
+    # Momentary Decora switch (Leviton 5655-2 or equivalent): each press fires
+    # once; release is ignored. Dispatch is endstop-driven, not state-driven —
+    # both deployed-end endstops tripped ⇒ CLOSE, otherwise ⇒ OPEN. A press
+    # mid-CLOSING reverses to OPENING (open_lift stops close_lift first); a
+    # press mid-OPENING re-executes open_lift (mode:restart, harmless). FAULT
+    # requires manual recovery via "Diag: reset to CLOSED".
     on_press:
       then:
         - lambda: |-
             int s = id(lift_state);
-            ESP_LOGI("lift", "switch ON (state=%d)", s);
-            if (s == 0) {
-              id(open_lift).execute();
-            } else if (s == 4) {
-              ESP_LOGI("lift", "canceling cooldown");
-              id(cooldown_timer).stop();
-              id(open_lift).execute();
+            bool deployed = id(endstop_a).state && id(endstop_b).state;
+            ESP_LOGI("lift", "button press (state=%d deployed=%d)", s, deployed);
+            if (s == 5) {
+              ESP_LOGW("lift", "in FAULT — ignoring button; run Diag: reset");
+              return;
             }
-            // s == 2 (already OPEN) and motion/FAULT states: ignore.
-    on_release:
-      then:
-        - lambda: |-
-            int s = id(lift_state);
-            ESP_LOGI("lift", "switch OFF (state=%d)", s);
-            if (s == 2) {
+            if (deployed) {
               id(close_lift).execute();
+            } else {
+              if (s == 4) {
+                ESP_LOGI("lift", "canceling cooldown");
+                id(cooldown_timer).stop();
+              }
+              id(open_lift).execute();
             }
-            // s == 0 (already CLOSED), COOLDOWN, motion/FAULT: ignore.
 
   - platform: gpio
     pin:
@@ -534,15 +534,13 @@ script:
           id: lpwm
           brightness: !lambda return id(cruise_pct).state / 100.0;
           transition_length: !lambda return id(ramp_ms).state;
-      # Hold off EOT/stall checks until ramp completes + 250 ms current settle.
+      # Hold off EOT checks until ramp completes + 250 ms current settle.
       - delay: !lambda return id(ramp_ms).state + 250;
       - wait_until:
           condition:
             lambda: |-
-              // Stall detection disabled until BTS IS pulldowns are reduced
-              // (10 kΩ on-module → ADC saturates at ~2.7 A motor current, so
-              // any real motion looks like a stall). Primary EOT is endstops;
-              // travel_timeout below is the failsafe.
+              // EOT for OPENING is purely endstop-driven; travel_timeout below
+              // is the failsafe if a switch or wire goes bad.
               return id(endstop_a).state && id(endstop_b).state;
           timeout: !lambda return (uint32_t)(id(travel_timeout_s).state * 1000);
       - light.turn_off:
@@ -560,7 +558,6 @@ script:
   # PJLink OFF starts the projector's internal cooldown. AVR returns to
   # INDOOR mode now (per §12 spec); in the expected user flow Apple TV is
   # already powered down so Zone 2 is silent — there's no audio to cut.
-  # Stall during retract = unknown jam → latch FAULT, no auto-reverse.
   - id: close_lift
     mode: restart
     then:
@@ -583,10 +580,12 @@ script:
       - wait_until:
           condition:
             lambda: |-
-              // Stall detection disabled until BTS IS pulldowns are reduced.
-              // EOT (current drops to ~0 V when PA-04 internal limits open)
-              // still works — it's a high→low transition, not an absolute
-              // current level, and the ADC reads 0 V correctly at the low end.
+              // EOT for CLOSING is current-drop on R_IS: when each PA-04 hits
+              // its internal retract limit, the limit switch opens the motor
+              // circuit and IS-pin voltage falls toward 0. The high end of
+              // the IS range saturates the ADC (on-module 10 kΩ pulldown is
+              // too high a value for the operating current), but the low end
+              // reads cleanly — "below eot_v on both sides" is the signal.
               float eot = id(eot_v).state;
               float ar  = id(a_ris).state;
               float br  = id(b_ris).state;
@@ -625,29 +624,6 @@ script:
       - lambda: |-
           id(lift_state) = 0;
           ESP_LOGI("lift", "cooldown done → CLOSED");
-
-  # Stall during extend = obstruction below ⇒ back off briefly to clear it,
-  # then drop into FAULT for human attention rather than blindly continuing.
-  # ENs forced back ON because one side's endstop may have already tripped.
-  - id: stall_during_extend
-    then:
-      - logger.log:
-          format: "stall during extend — reversing 1.5s then FAULT"
-          level: WARN
-      - light.turn_off: { id: lpwm, transition_length: 100ms }
-      - delay: 200ms
-      - switch.turn_on: bts_a_enable
-      - switch.turn_on: bts_b_enable
-      - light.turn_on: { id: rpwm, brightness: 0.7, transition_length: 100ms }
-      - delay: 1500ms
-      - light.turn_off: { id: rpwm, transition_length: 200ms }
-      - delay: 300ms
-      - switch.turn_off: bts_a_enable
-      - switch.turn_off: bts_b_enable
-      - switch.turn_off: screen_relay
-      - lambda: |-
-          id(lift_state) = 5;
-          ESP_LOGW("lift", "→ FAULT (post-stall back-off)");
 
   # ---- Boot reconciliation ----------------------------------------------
   # Wait for WiFi before bothering the AVR/projector. Default to INDOOR mode

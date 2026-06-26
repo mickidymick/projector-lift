@@ -13,15 +13,15 @@ reference: [`../index.html`](../index.html) (rendered at
 | 26    | OUT (PWM)      | LPWM on BTS7960 #1 + #2 (extend  / open,  tied)            |
 | 27    | OUT            | BTS7960 #1 R_EN + L_EN (actuator A independent enable)     |
 | 19    | OUT            | BTS7960 #2 R_EN + L_EN (actuator B independent enable)     |
-| 32    | ADC1_4         | BTS7960 #1 R_IS — actuator A extend current                |
-| 33    | ADC1_5         | BTS7960 #1 L_IS — actuator A retract current               |
-| 34    | ADC1_6         | BTS7960 #2 R_IS — actuator B extend current                |
-| 35    | ADC1_7         | BTS7960 #2 L_IS — actuator B retract current               |
-| 17    | OUT (PWM)      | P55NF06L gate via 220 Ω — fan PWM (6.5 V rail)             |
+| 32    | ADC1_4         | BTS7960 #1 R_IS — actuator A retract (close) current       |
+| 33    | ADC1_5         | BTS7960 #1 L_IS — actuator A extend  (open)  current       |
+| 34    | ADC1_6         | BTS7960 #2 R_IS — actuator B retract (close) current       |
+| 35    | ADC1_7         | BTS7960 #2 L_IS — actuator B extend  (open)  current       |
+| 17    | OUT (PWM)      | IRLZ44N gate via 220 Ω — fan PWM (6.5 V rail)             |
 | 16    | OUT            | 1 kΩ → BC547 base → F-1001 coil (screen relay)             |
-| 18    | IN, pull-up    | Wall button, switch-to-GND                                 |
-| 23    | IN, pull-up    | Endstop A SIG (slide A, Prusa MK3 NO-to-GND)               |
-| 22    | IN, pull-up    | Endstop B SIG (slide B, Prusa MK3 NO-to-GND)               |
+| 18    | IN, pull-up    | Momentary Decora wall switch, switch-to-GND                |
+| 23    | IN, pull-up    | Endstop A SIG (deployed end, Prusa MK3 NO-to-GND)          |
+| 22    | IN, pull-up    | Endstop B SIG (deployed end, Prusa MK3 NO-to-GND)          |
 
 All current-sense pins are on ADC1 (ADC2 is unusable while WiFi is active).
 Endstop +Vcc is taken from the ESP32's 3V3 pin (AMS1117 output) so the Prusa
@@ -77,40 +77,45 @@ Don't wire the whole box at once. Work outward from the ESP32:
    `Diag: jog retract 500ms`. Watch `Actuator A R_IS` / `L_IS` — voltage
    spikes during motion, drops when the motor stops.
 
-3. **Calibrate thresholds.** Trigger a longer extend by holding `Diag: jog
-   extend` repeatedly, or temporarily extend the jog duration in the YAML.
-   Watch the L_IS reading:
-   - **Running**: typical PA-04 draws ~3 A under no load ⇒ ~1.5 V on IS
-     (BTS7960 current-sense ratio is ~8500:1, ~0.5 V/A).
-   - **End-of-travel** (PA-04 internal limit): drops to near 0 V.
-   - **Stall**: spikes to ~2× running.
+3. **Calibrate the EOT threshold.** Trigger a longer retract by holding
+   `Diag: jog retract` repeatedly, or temporarily extend the jog duration in
+   the YAML. Watch the `Actuator A R_IS` reading:
+   - **Running**: voltage rails high (the on-module 10 kΩ pulldown saturates
+     the ADC at expected motor current — this is fine, we only care about
+     the low end).
+   - **End-of-travel** (PA-04 internal limit opens the motor circuit): drops
+     to near 0 V.
 
-   Set `End-of-travel threshold` to ~30 % of running and `Stall threshold`
-   to ~1.7× running. Wider gap between EOT and stall = fewer false trips.
+   Set `End-of-travel threshold` somewhere comfortably above the noise floor
+   but below the lowest "running" reading you ever see — 0.1–0.3 V is the
+   usual band. Stall detection is not implemented in this build; we rely on
+   the deployed-end endstops on extend and the PA-04 internal limits on
+   retract, with `Travel safety timeout` as the failsafe in both directions.
 
 4. **Add second BTS7960 + PA-04.** Wire actuator B with GPIO19 to its EN
    pins and GPIO34 / GPIO35 for current sense. Re-test jogs — both actuators
    should move together (RPWM/LPWM are tied). If one runs noticeably faster
    it's a mechanical imbalance, not electrical.
 
-5. **Add endstops.** Mount one Prusa MK3 endstop per drawer slide so the
-   lever trips ~¼" before the slide's hard stop. Wire NO to GND, SIG to
-   GPIO23/22, +Vcc to the perfboard's 3.3 V rail (not 5 V — see warning in
-   doc §8). Confirm `Endstop A` / `Endstop B` flip when you manually
-   actuate them. With both BTSes wired, run a full extend via the HA cover —
-   the lift should stop the moment both sides' endstops trip, with the
-   first-tripped side's EN dropping while the other continues. (The cover's
-   wait_until requires *both* endstops to fire; with only one BTS wired the
-   second endstop never trips and the open sequence terminates on the
-   `Travel safety timeout` instead — useful as a fallback test, but not the
-   primary check.)
+5. **Add endstops.** Mount one Prusa MK3 endstop on each main-box wall at the
+   chosen deployed position; mount a small bracket on the top of the inner
+   box so it trips both endstops as the box descends to that position. Wire
+   NO to GND, SIG to GPIO23/22, +Vcc to the perfboard's 3.3 V rail (not 5 V —
+   see warning in doc §8). Confirm `Endstop A` / `Endstop B` flip when you
+   manually actuate them. With both BTSes wired, run a full extend via the
+   HA cover — the lift should stop the moment both sides' endstops trip,
+   with the first-tripped side's EN dropping while the other continues.
+   (The cover's wait_until requires *both* endstops to fire; with only one
+   BTS wired the second endstop never trips and the open sequence terminates
+   on the `Travel safety timeout` instead — useful as a fallback test, but
+   not the primary check.)
 
 6. **Add screen relay.** Connect GPIO16 → 1 kΩ → BC547 base, BC547 collector
    → F-1001 trigger. Test the `Screen relay` switch in HA. Listen for the
    F-1001 click.
 
 7. **Add fan-driver board.** Connect GPIO17 (via the FAN SIG plug, 220 Ω in
-   series at the fan-driver perfboard) to the P55NF06L gate. Use the
+   series at the fan-driver perfboard) to the IRLZ44N gate. Use the
    `Fan running duty` slider in HA to verify smooth PWM control of both
    AIRPLATE fans.
 
@@ -130,14 +135,17 @@ Don't wire the whole box at once. Work outward from the ESP32:
 | State    | Trigger                | Behavior                                                                 |
 |----------|------------------------|--------------------------------------------------------------------------|
 | CLOSED   | boot / cooldown done   | All outputs OFF. BTS ENs LOW. Wait for button or HA open.                |
-| OPENING  | open command           | PJLink ON, AVR → OUTDOOR, screen drops, fan PWM at running duty, ENs HIGH, LPWM ramps. Each endstop trip drops its own EN; both tripped ⇒ OPEN. Stall ⇒ reverse-and-FAULT. |
+| OPENING  | open command           | PJLink ON, AVR → OUTDOOR, screen drops, fan PWM at running duty, ENs HIGH, LPWM ramps. Each endstop trip drops its own EN; both tripped ⇒ OPEN. Timeout ⇒ FAULT. |
 | OPEN     | both endstops tripped  | PWM 0, ENs LOW. Fan stays at running duty. AVR polled every 5 s for HA visibility. Wait for close. |
-| CLOSING  | close command          | PJLink OFF, AVR → INDOOR, ENs HIGH, RPWM ramps. Current collapse ⇒ COOLDOWN. Stall ⇒ FAULT (no auto-reverse — different safety profile). |
+| CLOSING  | close command          | PJLink OFF, AVR → INDOOR, ENs HIGH, RPWM ramps. R_IS collapse on both sides ⇒ COOLDOWN. Timeout ⇒ FAULT. |
 | COOLDOWN | retract EOT            | Screen retracts after `screen_delay_s`. Fan steps down to cooldown duty for `cooldown_min`. ENs LOW. |
-| FAULT    | retract stall or panic | All PWM off, ENs LOW. Manual reset via `Diag: reset to CLOSED`.          |
+| FAULT    | travel timeout / panic | All PWM off, ENs LOW. Manual reset via `Diag: reset to CLOSED`.          |
 
-**Button during COOLDOWN** cancels the cooldown timer and re-opens.
-**Button during OPENING/CLOSING** is ignored — let motion finish.
+The wall button is a **momentary single-press** input — each press dispatches
+based on endstop state, not lift state: both deployed-end endstops tripped
+⇒ CLOSE, otherwise ⇒ OPEN. A press during CLOSING reverses cleanly to
+OPENING; a press during COOLDOWN cancels the timer and reopens; a press
+during FAULT is ignored (run the Diag reset instead).
 
 ## Tunables (HA `number` entities, persisted across reboots)
 
@@ -146,8 +154,7 @@ Don't wire the whole box at once. Work outward from the ESP32:
 - `Cruise duty` — 100 % default; lower for quieter / slower travel
 - `Fan running duty` — 100 % during OPENING/OPEN/CLOSING
 - `Fan cooldown duty` — 50 % during the long post-close dwell
-- `Stall threshold (V)` — calibrate per step 3
-- `End-of-travel threshold (V)` — calibrate per step 3 (now only used for
+- `End-of-travel threshold (V)` — calibrate per step 3 (only used for
   CLOSING; OPENING uses the endstops)
 - `Screen post-close delay` — 3 s; how long the box settles before the
   screen retracts

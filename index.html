@@ -943,6 +943,20 @@
 
     <li>
       <div class="thumb">
+        <img src="https://m.media-amazon.com/images/I/61pLi1ZpD8L._AC_SL1500_.jpg" alt="Square D X-Series momentary rocker switch" loading="lazy">
+      </div>
+      <div class="info">
+        <div class="name">Square D X-Series momentary rocker switch <span style="color:var(--muted);font-weight:400;font-size:12px">(SQR14106WH · 1-gang · matte white · UL listed)</span></div>
+        <div class="desc">Wall-mounted mode lever for INDOOR/OUTDOOR switching. Momentary action (press → contact closes → ESP32 GPIO pulled to GND through internal pull-up → state machine sees one press event; release → returns to neutral) is exactly the right behavior for a toggle-driven mode lever — no risk of getting stuck in a half-state on power cycle, no need to read a maintained position. 15 A / 120-277 V AC rating is overkill here (we're only switching a logic-level signal at &lt;1 mA), but the contacts work the same regardless of voltage. Modular face plate lets the parents swap rocker color later without rewiring. Replaces the original reused wall button — fresh part means clean contact bounce profile (the firmware's <code>delayed_on/off: 30 ms</code> debounce was tuned against the aged button and the new switch may want re-tuning at install).</div>
+      </div>
+      <div class="side">
+        <div class="price-line">$11.10</div>
+        <a class="buy-link" href="https://www.amazon.com/Schneider-Electric-Momentary-Upgrades-SQR14106WH/dp/B0F9G135FM" target="_blank" rel="noopener">Buy on Amazon</a>
+      </div>
+    </li>
+
+    <li>
+      <div class="thumb">
         <img src="https://mm.digikey.com/Volume0/opasdata/d220001/derivates/1/300/281/720/MFG_LRS-150_sml.jpg" alt="Mean Well LRS-150-12 power supply" loading="lazy">
       </div>
       <div class="info">
@@ -950,8 +964,8 @@
         <div class="desc">Comfortable margin over the real load: 2× actuators at ~2-3A each running, ~5-6A peak per actuator at full force (we're well under the 100 lb rated load), plus the 5V + 6.5V buck rails. ~7A worst-case continuous on a 12.5A supply = ~43% headroom. 159×97×30 mm — same width/thickness as the LRS-100, just 30 mm longer along the long axis (account for that when laying out the box). Same fanless slim profile, same screw terminals, same Mean Well industrial workhorse family.</div>
       </div>
       <div class="side">
-        <div class="price-line">~$30</div>
-        <a class="buy-link" href="https://www.amazon.com/MEAN-WELL-LRS-150-12-Enclosed-Switchable/dp/B00M8TBJLK" target="_blank" rel="noopener">Buy on Amazon</a>
+        <div class="price-line">$23.00</div>
+        <a class="buy-link" href="https://www.amazon.com/dp/B07WNDHNFN" target="_blank" rel="noopener">Buy on Amazon</a>
       </div>
     </li>
 
@@ -1017,7 +1031,7 @@
       </div>
       <div class="info">
         <div class="name">AC Infinity AIRPLATE S3 (Pack of 2) <span style="color:var(--muted);font-weight:400;font-size:12px">— 6" AV-cabinet cooling fan system</span></div>
-        <div class="desc">Matched pair of single-fan AV cabinet units with built-in grills. One mounts in the false top (intake from electronics compartment, pulling air down into the main cavity); the other mounts in the rear long wall (exhaust). <strong>Cut off the USB cable, inline speed controller, and wall wart</strong> a few inches past each fan body — the AIRPLATE motors are 6.5 V DC, and we drive both directly off a dedicated buck rail with ESP32-PWM speed control via a P55NF06L MOSFET on the perfboard. No AC routing inside the projector box, real software speed control across modes, two fewer wall warts to find outlets for.</div>
+        <div class="desc">Matched pair of single-fan AV cabinet units with built-in grills. One mounts in the false top (intake from electronics compartment, pulling air down into the main cavity); the other mounts in the rear long wall (exhaust). <strong>Cut off the USB cable, inline speed controller, and wall wart</strong> a few inches past each fan body — the AIRPLATE motors are 6.5 V DC, and we drive both directly off a dedicated buck rail with ESP32-PWM speed control via a IRLZ44N MOSFET on the perfboard. No AC routing inside the projector box, real software speed control across modes, two fewer wall warts to find outlets for.</div>
       </div>
       <div class="side">
         <div class="price-line">$59.98<span class="unit">2-pack</span></div>
@@ -1045,7 +1059,7 @@
       </div>
       <div class="info">
         <div class="name" style="text-decoration:line-through;">SSR-25DA solid-state relay</div>
-        <div class="desc"><strong style="color:#b91c1c;">REMOVED 2026-06-21.</strong> Initially specced to switch AC to the AIRPLATE wall warts. Replaced by P55NF06L low-side MOSFET on the perfboard driving the fans directly from a dedicated 6.5 V LM2596 buck rail — better speed control, no AC routing in the box, two fewer wall warts. Don't buy.</div>
+        <div class="desc"><strong style="color:#b91c1c;">REMOVED 2026-06-21.</strong> Initially specced to switch AC to the AIRPLATE wall warts. Replaced by IRLZ44N low-side MOSFET on the perfboard driving the fans directly from a dedicated 6.5 V LM2596 buck rail — better speed control, no AC routing in the box, two fewer wall warts. Don't buy.</div>
       </div>
       <div class="side">
         <div class="price-line" style="text-decoration:line-through;">$9.99</div>
@@ -1055,15 +1069,15 @@
 
     <li>
       <div class="thumb">
-        <span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;background:#1f2937;border-radius:4px;font-size:9px;font-family:monospace;color:#fff;text-align:center;line-height:1.1;font-weight:700;">P55<br>NF06L</span>
+        <span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;background:#1f2937;border-radius:4px;font-size:10px;font-family:monospace;color:#fff;text-align:center;line-height:1.1;font-weight:700;">IRLZ<br>44N</span>
       </div>
       <div class="info">
-        <div class="name">P55NF06L logic-level NMOSFET <span style="color:var(--muted);font-weight:400;font-size:12px">(STMicroelectronics, TO-220, 60 V / 50 A)</span></div>
-        <div class="desc">Low-side switch driving the 6.5 V fan rail. Logic-level gate (Vgs(th) 1–2.5 V) means 3.3 V from ESP32 GPIO 17 fully enhances the channel. Wild current overkill (50 A rated vs ~1 A actual fan draw) keeps it cold and bulletproof. <strong>Sourced from junk box 2026-06-21.</strong> If you need another, a 10-pack on Amazon is ~$7.</div>
+        <div class="name">IRLZ44N logic-level NMOSFET (10-pack) <span style="color:var(--muted);font-weight:400;font-size:12px">(Infineon/IR, TO-220, 55 V / 47 A)</span></div>
+        <div class="desc">Low-side switch driving the 6.5 V fan rail. Logic-level gate (Vgs(th) max 2 V, Rds(on) spec'd at Vgs = 5 V) means 3.3 V from ESP32 GPIO 17 fully enhances the channel — the canonical Arduino/ESP32 PWM MOSFET. Wild current overkill (47 A rated vs ~1 A actual fan draw) keeps the part cold (~50 mW dissipation, room-temperature TO-220 tab). 10-pack gives 9 spares for future PWM/switching projects. <strong>Replaces the P55NF06L originally pulled from the junk box 2026-06-21</strong> — Amazon's P55NF06L listings are flagged for counterfeit risk, so we went with a fresh known-good logic-level part instead. Electrically equivalent (both logic-level, both wildly oversized for this load); the junk-box P55NF06L stays as a bench-test backup.</div>
       </div>
       <div class="side">
-        <div class="price-line">$0</div>
-        <span class="buy-link keep">JUNK BOX</span>
+        <div class="price-line">$9.99<span class="unit">10-pack</span></div>
+        <a class="buy-link" href="https://www.amazon.com/dp/B0CBKH4XGL" target="_blank" rel="noopener">Buy on Amazon</a>
       </div>
     </li>
 
@@ -1101,7 +1115,7 @@
       </div>
       <div class="info">
         <div class="name">Chanzon double-sided perfboard kit <span style="color:var(--muted);font-weight:400;font-size:12px">(34 boards, 5 sizes incl. 5×7 and 7×9 cm)</span></div>
-        <div class="desc">The substrate for all four through-hole boards in this build. 2.54 mm hole pitch + plated through-holes on both sides. <strong>One 7×9 cm board</strong> for the main control board (ESP32 + 2× BTS7960 sockets + BC547 + 1 kΩ + 2× endstop headers + 4× Phoenix plugs). <strong>Three 5×7 cm boards</strong> for the three small boards: the fan-driver perfboard (P55NF06L + gate network + flyback + 3 plugs), the 12 V power board (3 A fuse + 4 plugs — see Diagram #5), and the motor fuse board (2× 5 A fuses + 1000 µF bulk cap + P6KE15CA TVS + 3 plugs — see Diagram #6). ~30 spares for future projects.</div>
+        <div class="desc">The substrate for all four through-hole boards in this build. 2.54 mm hole pitch + plated through-holes on both sides. <strong>One 7×9 cm board</strong> for the main control board (ESP32 + 2× BTS7960 sockets + BC547 + 1 kΩ + 2× endstop headers + 4× Phoenix plugs). <strong>Three 5×7 cm boards</strong> for the three small boards: the fan-driver perfboard (IRLZ44N + gate network + flyback + 3 plugs), the 12 V power board (3 A fuse + 4 plugs — see Diagram #5), and the motor fuse board (2× 5 A fuses + 1000 µF bulk cap + P6KE15CA TVS + 3 plugs — see Diagram #6). ~30 spares for future projects.</div>
       </div>
       <div class="side">
         <div class="price-line">$8.99</div>
@@ -1305,6 +1319,20 @@
       </div>
     </li>
 
+    <li>
+      <div class="thumb">
+        <span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;background:#fafaf9;border-radius:4px;font-size:11px;font-family:ui-sans-serif,system-ui;color:#1f2937;font-weight:700;text-align:center;line-height:1.1;">Leviton<br>5655-2W</span>
+      </div>
+      <div class="info">
+        <div class="name">Leviton 5655-2W momentary Decora wall switch <span style="color:var(--muted);font-weight:400;font-size:12px">single-pole · 15 A / 120-277 V · commercial spec · white</span></div>
+        <div class="desc">Replaces the existing maintained-toggle wall switch in the porch gang box. Standard Decora form factor — drops into the existing single-gang opening and faceplate. Single-pole momentary: each press closes once and spring-returns to off, exactly two terminals. <strong>Why the swap:</strong> a momentary press becomes an event the firmware can dispatch on (single tap → open or close based on endstop state), instead of a maintained state that fights remote/voice control whenever the wall switch position drifts out of sync with the lift's actual position. <strong>Constraint:</strong> only 2 wires run to the gang box, so a 3-conductor SPDT center-off (Leviton 5657) isn't an option. Existing in-wall 2-wire run is reused as the signal pair back to the ESP32's GPIO 18 (switch-to-GND, INPUT_PULLUP). The Decora rocker is rated for 120-277 V mains but works fine as a low-voltage signal switch; we're using a tiny fraction of its contact rating.</div>
+      </div>
+      <div class="side">
+        <div class="price-line">$17.97</div>
+        <a class="buy-link" href="https://www.homedepot.com/p/Leviton-15-Amp-120-277-VAC-Decora-Plus-Single-Pole-Rocker-Light-Switch-Momentary-Contact-Commercial-Specification-White-5655-2W/308986534" target="_blank" rel="noopener">Buy at Home Depot</a>
+      </div>
+    </li>
+
     <li class="buy-section-header" style="display:block;border-bottom:none;padding:22px 0 0;">AV chain rebuild — receiver, streamer, cables</li>
 
     <li>
@@ -1397,7 +1425,7 @@
 
   <div class="buy-subtotal">
     <span>Control electronics + cooling + mounting subtotal</span>
-    <span>~$679</span>
+    <span>~$693</span>
   </div>
 
   <div class="buy-subtotal">
@@ -1407,7 +1435,7 @@
 
   <div class="buy-subtotal grand">
     <span>Store-bought total (incl. shroud materials + AV chain — screen kept)</span>
-    <span>~$5,677</span>
+    <span>~$5,691</span>
   </div>
 
   <p style="margin-top:10px;margin-bottom:0;font-size:13px;color:var(--muted)">
@@ -1416,7 +1444,7 @@
 
   <div class="buy-reuse">
     <strong>Reuse from existing system / on-hand stock (no cost)</strong>
-    Wall button · IR repeater · CZH-LABS F-1001/5V relay (screen 12V trigger) · AC power strip · drawer slides (×4) · <strong>existing 120" 16:9 VMAX2 screen</strong> (proven 10+ yr porch survival, manual tensioner workflow continues) · <strong>Sony XR-55A80K TV</strong> · <strong>house speakers + porch speakers</strong> (re-terminated to new AVR Zone 1 main + Zone 2 amp outputs) · <strong>existing 50 ft HDMI 2.0 cable</strong> Denon→projector run (re-terminated to new AVR Out 2; 4K60/HDR/ARC-rated, ~4× headroom over WUXGA60) · <strong>existing TV-Denon HDMI cable</strong> (re-terminated to new AVR Out 1; verify 4K HDR pass-through after install, $15 swap if flaky) · <strong>Cat5e from Zach's on-hand stock</strong> for projector PJLink run · <strong>pneumatic gas struts (×2)</strong> from a prior build, mounted between short walls + lid underside to hold the service lid open hands-free
+    IR repeater · CZH-LABS F-1001/5V relay (screen 12V trigger) · AC power strip · drawer slides (×4) · <strong>existing 120" 16:9 VMAX2 screen</strong> (proven 10+ yr porch survival, manual tensioner workflow continues) · <strong>Sony XR-55A80K TV</strong> · <strong>house speakers + porch speakers</strong> (re-terminated to new AVR Zone 1 main + Zone 2 amp outputs) · <strong>existing 50 ft HDMI 2.0 cable</strong> Denon→projector run (re-terminated to new AVR Out 2; 4K60/HDR/ARC-rated, ~4× headroom over WUXGA60) · <strong>existing TV-Denon HDMI cable</strong> (re-terminated to new AVR Out 1; verify 4K HDR pass-through after install, $15 swap if flaky) · <strong>Cat5e from Zach's on-hand stock</strong> for projector PJLink run · <strong>pneumatic gas struts (×2)</strong> from a prior build, mounted between short walls + lid underside to hold the service lid open hands-free
   </div>
 
   <div class="buy-reuse" style="margin-top:10px;background:#fef2f2;border:1px solid #fecaca;color:#7f1d1d">
@@ -2554,7 +2582,7 @@
 
   <!-- Wall button -->
   <rect class="block blk-reuse" x="700" y="20" width="180" height="56" rx="6"/>
-  <text class="lbl-bold" x="790" y="42" text-anchor="middle">Wall button (reuse)</text>
+  <text class="lbl-bold" x="790" y="42" text-anchor="middle">Wall button (Square D X-Series)</text>
   <text class="lbl-small" x="790" y="60" text-anchor="middle">momentary, switch-to-GND</text>
 
   <!-- AC trunk: mains → Mean Well only (no AC outside the PSU) -->
@@ -2577,7 +2605,7 @@
   <rect class="block" x="700" y="100" width="180" height="60" rx="6"/>
   <text class="lbl-bold" x="790" y="122" text-anchor="middle">AIRPLATE S3 × 2</text>
   <text class="lbl-small" x="790" y="138" text-anchor="middle">DC fans @ 6.5 V, parallel</text>
-  <text class="lbl-small" x="790" y="152" text-anchor="middle">PWM via P55NF06L low-side</text>
+  <text class="lbl-small" x="790" y="152" text-anchor="middle">PWM via IRLZ44N low-side</text>
 
   <!-- LM2596 #2 → AIRPLATE fans (6.5V) -->
   <path class="c-12v" d="M 670 130 L 700 130" marker-end="url(#arrow)"/>
@@ -2727,7 +2755,7 @@
 </p>
 
 <div class="notes" style="border-left:4px solid #b45309;background:#fef3c7;padding:10px 14px;margin-top:12px;">
-  <strong>Block-diagram drift (read before building from this view):</strong> the block diagram above shows the original single-board system flow. The current build is the same <em>logically</em> (same components, same signal paths) but is split across <strong>four perfboards</strong>: a main control board (ESP32 + 2× BTS7960 + BC547 + endstop headers + 4 Phoenix plugs), a fan-driver board (P55NF06L MOSFET + 220 Ω/10 kΩ gate network + RB085T-60 flyback), a 12 V power board (3 A fuse + 5 plugs distributing fused 12 V to the two external bucks plus a SCREEN+RELAY plug pair that low-side-switches the screen trigger via the F-1001 — rewired 2026-06-26), and a motor fuse board (2× 5 A fuses + 1000 µF bulk cap + P6KE15CA TVS + 3 plugs carrying the high-current BTS B+ feeds). Both LM2596 bucks are <em>standalone</em> modules, not on any perfboard. The SSR-25DA shown above was removed 2026-06-21 and replaced by the fan-driver MOSFET with PWM speed control. Per-actuator endstops + a 3.3 V rail (ESP32 AMS1117 → endstop +Vcc) were added 2026-06-23, with the BTS EN lines split (GPIO 27 → BTS #1, GPIO 19 → BTS #2) so each endstop kills its own actuator. The 12 V infrastructure was split 2026-06-24 into the two separate power/fuse boards (bulk cap + TVS migrated to the motor fuse board to sit electrically close to BTS B+; per-actuator 5 A fusing replaced the shared 8 A for selectivity). F-1001 lives off-board with a 1N4148 flyback diode across its coil. <strong>For canonical wiring, use the §9 perfboard-layout diagrams below (#2 main board, #4 fan-driver, #5 12 V power, #6 motor fuse) — not this block view.</strong>
+  <strong>Block-diagram drift (read before building from this view):</strong> the block diagram above shows the original single-board system flow. The current build is the same <em>logically</em> (same components, same signal paths) but is split across <strong>four perfboards</strong>: a main control board (ESP32 + 2× BTS7960 + BC547 + endstop headers + 4 Phoenix plugs), a fan-driver board (IRLZ44N MOSFET + 220 Ω/10 kΩ gate network + RB085T-60 flyback), a 12 V power board (3 A fuse + 5 plugs distributing fused 12 V to the two external bucks plus a SCREEN+RELAY plug pair that low-side-switches the screen trigger via the F-1001 — rewired 2026-06-26), and a motor fuse board (2× 5 A fuses + 1000 µF bulk cap + P6KE15CA TVS + 3 plugs carrying the high-current BTS B+ feeds). Both LM2596 bucks are <em>standalone</em> modules, not on any perfboard. The SSR-25DA shown above was removed 2026-06-21 and replaced by the fan-driver MOSFET with PWM speed control. Per-actuator endstops + a 3.3 V rail (ESP32 AMS1117 → endstop +Vcc) were added 2026-06-23, with the BTS EN lines split (GPIO 27 → BTS #1, GPIO 19 → BTS #2) so each endstop kills its own actuator. The 12 V infrastructure was split 2026-06-24 into the two separate power/fuse boards (bulk cap + TVS migrated to the motor fuse board to sit electrically close to BTS B+; per-actuator 5 A fusing replaced the shared 8 A for selectivity). F-1001 lives off-board with a 1N4148 flyback diode across its coil. <strong>For canonical wiring, use the §9 perfboard-layout diagrams below (#2 main board, #4 fan-driver, #5 12 V power, #6 motor fuse) — not this block view.</strong>
 </div>
 
 <!-- ====================================================================== -->
@@ -2745,7 +2773,7 @@
   <div style="display:flex;align-items:center;gap:8px;"><img src="https://m.media-amazon.com/images/I/71kPVtGPhbL._AC_SL1500_.jpg" alt="BTS7960" style="width:42px;height:42px;object-fit:contain;background:#fafaf9;border-radius:4px;"><span>BTS7960 × 2</span></div>
   <div style="display:flex;align-items:center;gap:8px;"><img src="https://m.media-amazon.com/images/I/61OSF51MAiL._SL1001_.jpg" alt="LM2596" style="width:42px;height:42px;object-fit:contain;background:#fafaf9;border-radius:4px;"><span>LM2596 (12 V → 5 V)</span></div>
   <div style="display:flex;align-items:center;gap:8px;"><img src="https://m.media-amazon.com/images/I/61rc7m9vEcL._SL1500_.jpg" alt="BC547" style="width:42px;height:42px;object-fit:contain;background:#fafaf9;border-radius:4px;"><span>BC547 + 1 kΩ</span></div>
-  <div style="display:flex;align-items:center;gap:8px;"><span style="display:inline-flex;width:42px;height:42px;align-items:center;justify-content:center;background:#fafaf9;border:1px solid var(--divider);border-radius:4px;font-size:11px;font-family:monospace;color:#1f2937;font-weight:700;">P55<br>NF06L</span><span>P55NF06L MOSFET</span></div>
+  <div style="display:flex;align-items:center;gap:8px;"><span style="display:inline-flex;width:42px;height:42px;align-items:center;justify-content:center;background:#fafaf9;border:1px solid var(--divider);border-radius:4px;font-size:11px;font-family:monospace;color:#1f2937;font-weight:700;">P55<br>NF06L</span><span>IRLZ44N MOSFET</span></div>
   <div style="display:flex;align-items:center;gap:8px;"><span style="display:inline-flex;width:42px;height:42px;align-items:center;justify-content:center;background:#fafaf9;border:1px solid var(--divider);border-radius:4px;font-size:20px;">⏻</span><span>Wall button (reuse)</span></div>
 </div>
 
@@ -3004,9 +3032,9 @@
   <text class="dest-sub" x="752" y="325" text-anchor="end">other side → GND</text>
   <path class="wc-wht" d="M 520 320 L 560 320"/>
 
-  <!-- P55NF06L MOSFET gate (fan PWM) → GPIO17 -->
+  <!-- IRLZ44N MOSFET gate (fan PWM) → GPIO17 -->
   <rect class="dest dest-sig" x="560" y="368" width="320" height="24" rx="5"/>
-  <text class="dest-lbl" x="572" y="385">P55NF06L MOSFET · gate (via 220 Ω)</text>
+  <text class="dest-lbl" x="572" y="385">IRLZ44N MOSFET · gate (via 220 Ω)</text>
   <text class="dest-sub" x="752" y="385" text-anchor="end">low-side PWM, 6.5 V fan rail</text>
   <path class="wc-grn" d="M 520 380 L 560 380"/>
 
@@ -3075,7 +3103,7 @@
     <tr><td><code>GPIO22</code></td><td>input (pull-up)</td><td>ENDSTOP B SIG (slide B side) — switch-to-GND on the Prusa MK3 board's NO contact. INPUT_PULLUP enabled in ESPHome. Endstop +Vcc must be on the 3.3 V rail (not 5 V) so the Prusa board's onboard LED/pull-up network can't drive this pin past the ESP32's 3.6 V max input.</td><td>white</td></tr>
     <tr><td><code>GPIO23</code></td><td>input (pull-up)</td><td>ENDSTOP A SIG (slide A side) — same wiring + same 3.3 V constraint as GPIO22.</td><td>white</td></tr>
     <tr><td><code>GPIO16</code></td><td>output</td><td>BC547 base (via 1 kΩ) → switches BC547 collector LOW, sinking F-1001 coil current to GND. F-1001 coil's + side is fed by SCREEN plug pin 1 from the 5 V rail. 1N4148 flyback diode lives off-board across the coil terminals.</td><td>white</td></tr>
-    <tr><td><code>GPIO17</code></td><td>output (PWM)</td><td>Out main board via FAN SIG plug pin 2 → fan-driver SIG IN pin 2 → 220 Ω → P55NF06L MOSFET gate — low-side PWM control of both AIRPLATE fans on 6.5 V rail</td><td>green</td></tr>
+    <tr><td><code>GPIO17</code></td><td>output (PWM)</td><td>Out main board via FAN SIG plug pin 2 → fan-driver SIG IN pin 2 → 220 Ω → IRLZ44N MOSFET gate — low-side PWM control of both AIRPLATE fans on 6.5 V rail</td><td>green</td></tr>
     <tr><td><code>GPIO18</code></td><td>input (pull-up)</td><td>Wall button — switch-to-GND, internal pull-up enabled in ESPHome</td><td>white</td></tr>
   </tbody>
 </table>
@@ -3312,7 +3340,7 @@
   <!-- expansion or just be left as bare perfboard.                                        -->
 
   <!-- ============ (FAN PWM driver lives on the fan-driver perfboard 2026-06-23) ============ -->
-  <!-- P55NF06L MOSFET, 220 Ω gate resistor, 10 kΩ pulldown, RB085T-60 Schottky flyback, -->
+  <!-- IRLZ44N MOSFET, 220 Ω gate resistor, 10 kΩ pulldown, RB085T-60 Schottky flyback, -->
   <!-- and the external LM2596 #2 buck all live off the main control board. The main      -->
   <!-- board hands the fan driver just two wires via Plug 4 (FAN SIG):                    -->
   <!--   pin 1 = GND (from main GND rail)                                                 -->
@@ -3876,7 +3904,7 @@
   <div style="display:flex;align-items:center;gap:8px;"><img src="https://www.progressiveautomations.com/cdn/shop/files/41be031b696edb47dc91f17ff51d08b32d3a61e6359aa3ebf55ff99759c52ee9_589a1fbd-fb1e-412f-8b3c-7c9569fa7d64.jpg?v=1780321423&amp;width=400" alt="PA-04 actuator" style="width:42px;height:42px;object-fit:contain;background:#fafaf9;border-radius:4px;"><span>PA-04 actuator × 2</span></div>
   <div style="display:flex;align-items:center;gap:8px;"><span style="display:inline-flex;width:42px;height:42px;align-items:center;justify-content:center;background:#fafaf9;border:1px solid var(--divider);border-radius:4px;font-size:20px;">⏻</span><span>Wall button</span></div>
   <div style="display:flex;align-items:center;gap:8px;"><img src="https://elitescreens.com/wp-content/uploads/VMAX2_App-700x518.jpg" alt="Elite VMAX2" style="width:42px;height:42px;object-fit:contain;background:#fafaf9;border-radius:4px;"><span>VMAX2 12 V trigger</span></div>
-  <div style="display:flex;align-items:center;gap:8px;"><span style="display:inline-flex;width:42px;height:42px;align-items:center;justify-content:center;background:#fafaf9;border:1px solid var(--divider);border-radius:4px;font-size:10px;font-family:monospace;color:#1f2937;font-weight:700;text-align:center;line-height:1;">P55<br>NF06L</span><span>P55NF06L + RB085T-60</span></div>
+  <div style="display:flex;align-items:center;gap:8px;"><span style="display:inline-flex;width:42px;height:42px;align-items:center;justify-content:center;background:#fafaf9;border:1px solid var(--divider);border-radius:4px;font-size:10px;font-family:monospace;color:#1f2937;font-weight:700;text-align:center;line-height:1;">P55<br>NF06L</span><span>IRLZ44N + RB085T-60</span></div>
 </div>
 
 <!-- 2×3 grid of plug cards -->
@@ -3989,7 +4017,7 @@
 
 <h3 style="margin-top:32px">Fan-driver perfboard (separate small board)</h3>
 <p style="margin-top:0;font-size:14px;color:var(--muted)">
-  The P55NF06L MOSFET, the 220 Ω + 10 kΩ gate network, and the RB085T-60 flyback diode live on a dedicated small perfboard (~5 × 7 cm). <strong>The LM2596 #2 buck is NOT on this board</strong> — it sits standalone, takes 12 V from wherever you tap it, and feeds its 6.5 V output into this board's BUCK IN plug. Three 2-pos Phoenix plugs along the top edge: <strong>BUCK IN</strong> (+6.5 V from the external buck), <strong>SIG IN</strong> (GND + GPIO 17 PWM from the main control board), <strong>FAN OUT</strong> (+6.5 V continuous + MOSFET-switched return, to both AIRPLATE fans in parallel).
+  The IRLZ44N MOSFET, the 220 Ω + 10 kΩ gate network, and the RB085T-60 flyback diode live on a dedicated small perfboard (~5 × 7 cm). <strong>The LM2596 #2 buck is NOT on this board</strong> — it sits standalone, takes 12 V from wherever you tap it, and feeds its 6.5 V output into this board's BUCK IN plug. Three 2-pos Phoenix plugs along the top edge: <strong>BUCK IN</strong> (+6.5 V from the external buck), <strong>SIG IN</strong> (GND + GPIO 17 PWM from the main control board), <strong>FAN OUT</strong> (+6.5 V continuous + MOSFET-switched return, to both AIRPLATE fans in parallel).
 </p>
 
 <div style="background:#fff;border:1px solid var(--divider);border-radius:8px;padding:16px;margin:12px 0;overflow-x:auto;">
@@ -4095,7 +4123,7 @@
   <path class="fb-tr-65" d="M 458 94 L 458 400"/>
   <circle class="fb-joint" cx="458" cy="400" r="2"/>
 
-  <!-- ============ P55NF06L MOSFET (TO-220, stood up) ============ -->
+  <!-- ============ IRLZ44N MOSFET (TO-220, stood up) ============ -->
   <g transform="translate(290, 230)">
     <!-- Tab -->
     <rect x="0" y="0" width="40" height="14" fill="#a8a29e" stroke="#18181b" stroke-width="0.8"/>
@@ -4258,12 +4286,12 @@
     </tr>
     <tr>
       <td><strong style="color:#047857;">17</strong></td>
-      <td>SIG IN plug pin 2 → 220 Ω gate resistor left pad &nbsp;(through resistor)&nbsp; right pad → P55NF06L gate (G) <em>(10 kΩ pulldown also taps this gate node to GND — keeps the MOSFET hard-off at boot)</em></td>
+      <td>SIG IN plug pin 2 → 220 Ω gate resistor left pad &nbsp;(through resistor)&nbsp; right pad → IRLZ44N gate (G) <em>(10 kΩ pulldown also taps this gate node to GND — keeps the MOSFET hard-off at boot)</em></td>
       <td>green</td>
     </tr>
     <tr>
       <td><strong style="color:#5b21b6;">FAN</strong></td>
-      <td>P55NF06L drain (D) ↔ RB085T-60 pin 1 (A1) ↔ RB085T-60 pin 3 (A2) ↔ FAN OUT plug pin 1 <em>(switched return; MOSFET pulses this node to GND at the PWM duty. Pin 1 and pin 3 of the diode are both anodes — short on-board jumper ties them together for 2× current headroom, ~free.)</em></td>
+      <td>IRLZ44N drain (D) ↔ RB085T-60 pin 1 (A1) ↔ RB085T-60 pin 3 (A2) ↔ FAN OUT plug pin 1 <em>(switched return; MOSFET pulses this node to GND at the PWM duty. Pin 1 and pin 3 of the diode are both anodes — short on-board jumper ties them together for 2× current headroom, ~free.)</em></td>
       <td>purple</td>
     </tr>
   </tbody>
@@ -4824,13 +4852,13 @@
   <li><strong>Channel 2</strong>: unused (free for future expansion)</li>
 </ul>
 
-<h3 style="margin-top:20px">P55NF06L MOSFET fan PWM (on dedicated fan-driver perfboard)</h3>
+<h3 style="margin-top:20px">IRLZ44N MOSFET fan PWM (on dedicated fan-driver perfboard)</h3>
 <p style="margin-top:0;font-size:14px;color:var(--muted)">
   Both AIRPLATE S3 fans run as DC fans off a dedicated 6.5 V rail produced by an external LM2596 buck (fed 12 V from the future 12 V board). A single logic-level NMOSFET on the low side chops the GND return at the PWM duty set by ESP32 GPIO 17, giving us soft-start, variable speed by use case (quiet during viewing, full blast during cooldown), and complete elimination of AC routing inside the projector box. The factory wall warts, inline speed controllers, and SSR-25DA all get cut out and discarded. <strong>The MOSFET + gate network + diode all live on the fan-driver perfboard</strong> (diagram earlier in this section). The main control board hands the fan-driver board only two wires via Plug 4 (FAN SIG): GND and GPIO 17 PWM. The fan-driver board's +6.5 V supply comes from its own BUCK IN plug, fed by that external buck.
 </p>
 <ul>
   <li><strong>LM2596 #2</strong> dialed to 6.5 V before installation (turn the multi-turn trim pot while watching a multimeter on OUT+/OUT−). 12 V in from the future 12 V board's output, ~26 W headroom on the buck against ~3 W typical fan draw.</li>
-  <li><strong>P55NF06L NMOSFET</strong> in TO-220, low-side switch on the fan GND return path. Drain → FAN return (fan-driver OUTPUT plug pin 2 → both fans − leads). Source → fan-driver board GND rail. Gate → 220 Ω → fan-driver INPUT plug pin 3 (which carries GPIO 17 over from the main board). Tab is internally tied to drain — keep it isolated from anything grounded if the back plane is conductive.</li>
+  <li><strong>IRLZ44N NMOSFET</strong> in TO-220, low-side switch on the fan GND return path. Drain → FAN return (fan-driver OUTPUT plug pin 2 → both fans − leads). Source → fan-driver board GND rail. Gate → 220 Ω → fan-driver INPUT plug pin 3 (which carries GPIO 17 over from the main board). Tab is internally tied to drain — keep it isolated from anything grounded if the back plane is conductive.</li>
   <li><strong>220 Ω gate resistor</strong> in series with the GPIO-17 input. Limits the gate-charge inrush current during PWM switching transitions so the ESP32 pin isn't fighting the MOSFET's gate capacitance across the inter-board cable.</li>
   <li><strong>10 kΩ gate pulldown</strong> from the gate node to GND. Holds the MOSFET hard off when the ESP32 pin is floating (boot, reset, OTA in progress) so the fans don't run wild during the first ~200 ms after power-up.</li>
   <li><strong>RB085T-60 Schottky diode</strong> across the fan terminals as a flyback — this is the TO-220 3-pin common-cathode dual variant: pin 2 (middle, K, also the tab) to the +6.5 V net; pins 1 and 3 (both anodes, A1 and A2) tied together and to the FAN return / MOSFET drain net. Clamps the inductive spike when the MOSFET cuts current so the MOSFET's drain doesn't see a 30 V transient and avalanche. Paralleling both anodes gives ~16 A current headroom against ~1 A actual fan draw — wild overkill, but the jumper is free. Tab is at +6.5 V, not GND — keep it isolated from any grounded surface.</li>
@@ -5639,7 +5667,7 @@ Wall button state model stays in sync
   <li><strong>Solder up all four boards</strong> — per the §9 layout diagrams. Build order doesn't matter; each is independent until interconnect wiring.
     <ul style="margin:6px 0 0 18px;padding:0;font-size:13px;color:var(--muted);">
       <li><strong>Main control board</strong> (7×9 cm, Diagram #2) — 2× BTS7960 sockets stacked at the top, 2× Prusa endstop headers + BC547 + 1 kΩ in a vertical stack in the middle, ESP32 socket on the right, 4× Phoenix plugs along the left edge (5 V IN · BUTTON · SCREEN · FAN SIG), and three horizontal busses at the bottom (3.3 V · GND · 5 V).</li>
-      <li><strong>Fan-driver board</strong> (5×7 cm, Diagram #4) — P55NF06L MOSFET + 220 Ω gate resistor + 10 kΩ pulldown + RB085T-60 flyback + 3 plugs (BUCK IN · SIG IN · FAN OUT).</li>
+      <li><strong>Fan-driver board</strong> (5×7 cm, Diagram #4) — IRLZ44N MOSFET + 220 Ω gate resistor + 10 kΩ pulldown + RB085T-60 flyback + 3 plugs (BUCK IN · SIG IN · FAN OUT).</li>
       <li><strong>12 V power board</strong> (5×7 cm, Diagram #5) — 3 A fuse holder + 5 plugs (PSU IN · BUCK 1 OUT · BUCK 2 OUT · SCREEN · RELAY). Distributes one fused 12 V feed to the two external bucks and to the screen/relay pair (low-side switching of the screen − return via the F-1001).</li>
       <li><strong>Motor fuse board</strong> (5×7 cm, Diagram #6) — 2× 5 A fuse holders + 1000 µF bulk cap + P6KE15CA TVS + 3 plugs (PSU IN · BTS #1 OUT · BTS #2 OUT). Per-actuator fusing with bulk-cap inrush smoothing + TVS clamp sitting close to the BTS B+ pads.</li>
     </ul>
