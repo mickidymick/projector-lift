@@ -300,22 +300,31 @@ binary_sensor:
     filters:
       - delayed_on: 30ms
       - delayed_off: 30ms
+    # Maintained-toggle switch: GPIO LOW = switch in ON position = lift OPEN,
+    # GPIO HIGH = switch OFF = lift CLOSED. Each edge fires one transition.
+    # OPENING / CLOSING / FAULT mid-motion: ignore — let current motion finish.
     on_press:
       then:
         - lambda: |-
             int s = id(lift_state);
-            ESP_LOGI("lift", "button pressed (state=%d)", s);
+            ESP_LOGI("lift", "switch ON (state=%d)", s);
             if (s == 0) {
               id(open_lift).execute();
-            } else if (s == 2) {
-              id(close_lift).execute();
             } else if (s == 4) {
               ESP_LOGI("lift", "canceling cooldown");
               id(cooldown_timer).stop();
               id(open_lift).execute();
             }
-            // OPENING / CLOSING / FAULT: ignore — let motion finish or
-            // require a manual reset via the diag button.
+            // s == 2 (already OPEN) and motion/FAULT states: ignore.
+    on_release:
+      then:
+        - lambda: |-
+            int s = id(lift_state);
+            ESP_LOGI("lift", "switch OFF (state=%d)", s);
+            if (s == 2) {
+              id(close_lift).execute();
+            }
+            // s == 0 (already CLOSED), COOLDOWN, motion/FAULT: ignore.
 
   - platform: gpio
     pin:
@@ -477,7 +486,9 @@ script:
       - switch.turn_off: bts_b_enable
       - switch.turn_off: screen_relay
       - lambda: id(lift_state) = 0;
-      - logger.log: "→ CLOSED"
+      - logger.log:
+          format: "→ CLOSED"
+          level: INFO
 
   - id: emergency_stop
     then:
@@ -505,7 +516,9 @@ script:
       # would keep ramping RPWM after we set state=OPENING.
       - script.stop: close_lift
       - lambda: id(lift_state) = 1;
-      - logger.log: "→ OPENING"
+      - logger.log:
+          format: "→ OPENING"
+          level: INFO
       - script.execute: projector_power_on
       - script.execute: avr_outdoor
       - switch.turn_on: screen_relay
@@ -526,17 +539,10 @@ script:
       - wait_until:
           condition:
             lambda: |-
-              float stl = id(stall_v).state;
-              float al  = id(a_lis).state;
-              float bl  = id(b_lis).state;
-              // Stall (rare with endstops) — bail out to the reverse handler.
-              if (al > stl || bl > stl) {
-                ESP_LOGW("lift", "STALL extending: A_L=%.2fV B_L=%.2fV", al, bl);
-                id(stall_during_extend).execute();
-                return true;
-              }
-              // Primary EOT: both endstops tripped — bts_a_enable /
-              // bts_b_enable were already dropped by their on_press handlers.
+              // Stall detection disabled until BTS IS pulldowns are reduced
+              // (10 kΩ on-module → ADC saturates at ~2.7 A motor current, so
+              // any real motion looks like a stall). Primary EOT is endstops;
+              // travel_timeout below is the failsafe.
               return id(endstop_a).state && id(endstop_b).state;
           timeout: !lambda return (uint32_t)(id(travel_timeout_s).state * 1000);
       - light.turn_off:
@@ -560,7 +566,9 @@ script:
     then:
       - script.stop: open_lift
       - lambda: id(lift_state) = 3;
-      - logger.log: "→ CLOSING"
+      - logger.log:
+          format: "→ CLOSING"
+          level: INFO
       - script.execute: projector_power_off
       - script.execute: avr_indoor
       - light.turn_off: { id: lpwm, transition_length: 0s }
@@ -575,15 +583,13 @@ script:
       - wait_until:
           condition:
             lambda: |-
+              // Stall detection disabled until BTS IS pulldowns are reduced.
+              // EOT (current drops to ~0 V when PA-04 internal limits open)
+              // still works — it's a high→low transition, not an absolute
+              // current level, and the ADC reads 0 V correctly at the low end.
               float eot = id(eot_v).state;
-              float stl = id(stall_v).state;
               float ar  = id(a_ris).state;
               float br  = id(b_ris).state;
-              if (ar > stl || br > stl) {
-                ESP_LOGE("lift", "STALL retracting: A_R=%.2fV B_R=%.2fV — manual recovery", ar, br);
-                id(lift_state) = 5;
-                return true;
-              }
               return (ar < eot && br < eot);
           timeout: !lambda return (uint32_t)(id(travel_timeout_s).state * 1000);
       - light.turn_off:

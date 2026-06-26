@@ -1,3 +1,4 @@
 firmware/secrets.yaml
 firmware/.esphome/
+firmware/.platformio/
 firmware/build/
