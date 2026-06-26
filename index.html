@@ -943,15 +943,15 @@
 
     <li>
       <div class="thumb">
-        <img src="https://mm.digikey.com/Volume0/opasdata/d220001/derivates/1/300/281/720/MFG_LRS-100_sml.jpg" alt="Mean Well LRS-100-12 power supply" loading="lazy">
+        <img src="https://mm.digikey.com/Volume0/opasdata/d220001/derivates/1/300/281/720/MFG_LRS-150_sml.jpg" alt="Mean Well LRS-150-12 power supply" loading="lazy">
       </div>
       <div class="info">
-        <div class="name">Mean Well LRS-100-12 power supply <span style="color:var(--muted);font-weight:400;font-size:12px">(12V / 8.5A / 100W, fanless)</span></div>
-        <div class="desc">Right-sized for our real load: 2× actuators at ~2-3A each running, ~5-6A peak per actuator at full force (we're well under the 100 lb rated load). 8.5A capacity gives clean margin without the LRS-120's bulk. 129×97×30 mm (20% shorter + 20% thinner than the 120W). Fanless = silent. Mean Well's industrial workhorse.</div>
+        <div class="name">Mean Well LRS-150-12 power supply <span style="color:var(--muted);font-weight:400;font-size:12px">(12V / 12.5A / 150W, fanless)</span></div>
+        <div class="desc">Comfortable margin over the real load: 2× actuators at ~2-3A each running, ~5-6A peak per actuator at full force (we're well under the 100 lb rated load), plus the 5V + 6.5V buck rails. ~7A worst-case continuous on a 12.5A supply = ~43% headroom. 159×97×30 mm — same width/thickness as the LRS-100, just 30 mm longer along the long axis (account for that when laying out the box). Same fanless slim profile, same screw terminals, same Mean Well industrial workhorse family.</div>
       </div>
       <div class="side">
-        <div class="price-line">$19.99</div>
-        <a class="buy-link" href="https://www.amazon.com/MEAN-WELL-LRS-100-12-Switching-Single/dp/B019GYOMN6" target="_blank" rel="noopener">Buy on Amazon</a>
+        <div class="price-line">~$30</div>
+        <a class="buy-link" href="https://www.amazon.com/MEAN-WELL-LRS-150-12-Enclosed-Switchable/dp/B00M8TBJLK" target="_blank" rel="noopener">Buy on Amazon</a>
       </div>
     </li>
 
@@ -1188,7 +1188,7 @@
           <ul style="margin:6px 0 0 18px;padding:0;font-size:12px;color:var(--muted)">
             <li><strong>Main control board (4 plugs, all 2-pos as of 2026-06-23):</strong> 1× 5 V IN · 1× wall button · 1× SCREEN relay trigger · 1× <strong>FAN SIG</strong> (GND + GPIO 17 PWM) to fan-driver SIG IN. Motor wires land directly on the BTS7960 screw terminals — no plug needed.</li>
             <li><strong>Fan-driver perfboard (3 plugs, all 2-pos):</strong> 1× BUCK IN (+6.5 V from external buck) · 1× SIG IN (from main board's FAN SIG) · 1× FAN OUT to both AIRPLATE fans</li>
-            <li><strong>12 V power board (4 plugs, all 2-pos):</strong> 1× PSU IN · 1× BUCK 1 OUT (to LM2596 #1 input) · 1× BUCK 2 OUT (to LM2596 #2 input) · 1× SCREEN OUT (to F-1001 COM contact).</li>
+            <li><strong>12 V power board (5 plugs, all 2-pos):</strong> 1× PSU IN · 1× BUCK 1 OUT (to LM2596 #1 input) · 1× BUCK 2 OUT (to LM2596 #2 input) · 1× SCREEN (always-on +12 V / switched − pair to screen trigger) · 1× RELAY (switched node + GND pair to F-1001 CH1 NO/COM). Low-side switching: relay yanks screen − to GND when energized; +12 V to screen + is direct.</li>
             <li><strong>Motor fuse board (3 plugs, all 2-pos):</strong> 1× PSU IN · 1× BTS #1 OUT (B−/B+ to BTS7960 #1) · 1× BTS #2 OUT (B−/B+ to BTS7960 #2).</li>
           </ul>
           Currently used: 14× 2-pos. Kit has 25 of each pin count, so deep spares.
@@ -2167,7 +2167,7 @@
 
   <rect class="psu" x="390" y="125" width="60" height="60" rx="2"/>
   <text class="lbl-small" x="420" y="148" text-anchor="middle" fill="#fff">Mean Well</text>
-  <text class="lbl-small" x="420" y="162" text-anchor="middle" fill="#fff">LRS-100-12</text>
+  <text class="lbl-small" x="420" y="162" text-anchor="middle" fill="#fff">LRS-150-12</text>
   <text class="lbl-small" x="420" y="176" text-anchor="middle" fill="#fff">PSU</text>
 
   <!-- ============ MAIN CAVITY ============ -->
@@ -2563,7 +2563,7 @@
 
   <!-- Mean Well -->
   <rect class="block blk-ac" x="20" y="100" width="180" height="60" rx="6"/>
-  <text class="lbl-bold" x="110" y="125" text-anchor="middle">Mean Well LRS-100-12</text>
+  <text class="lbl-bold" x="110" y="125" text-anchor="middle">Mean Well LRS-150-12</text>
   <text class="lbl-small" x="110" y="142" text-anchor="middle">AC in → 12 V / 8.5 A out</text>
   <text class="lbl-small" x="110" y="156" text-anchor="middle">fanless · silent</text>
 
@@ -2727,7 +2727,7 @@
 </p>
 
 <div class="notes" style="border-left:4px solid #b45309;background:#fef3c7;padding:10px 14px;margin-top:12px;">
-  <strong>Block-diagram drift (read before building from this view):</strong> the block diagram above shows the original single-board system flow. The current build is the same <em>logically</em> (same components, same signal paths) but is split across <strong>four perfboards</strong>: a main control board (ESP32 + 2× BTS7960 + BC547 + endstop headers + 4 Phoenix plugs), a fan-driver board (P55NF06L MOSFET + 220 Ω/10 kΩ gate network + RB085T-60 flyback), a 12 V power board (3 A fuse + 4 plugs distributing fused 12 V to the two external bucks and the F-1001 contact-side), and a motor fuse board (2× 5 A fuses + 1000 µF bulk cap + P6KE15CA TVS + 3 plugs carrying the high-current BTS B+ feeds). Both LM2596 bucks are <em>standalone</em> modules, not on any perfboard. The SSR-25DA shown above was removed 2026-06-21 and replaced by the fan-driver MOSFET with PWM speed control. Per-actuator endstops + a 3.3 V rail (ESP32 AMS1117 → endstop +Vcc) were added 2026-06-23, with the BTS EN lines split (GPIO 27 → BTS #1, GPIO 19 → BTS #2) so each endstop kills its own actuator. The 12 V infrastructure was split 2026-06-24 into the two separate power/fuse boards (bulk cap + TVS migrated to the motor fuse board to sit electrically close to BTS B+; per-actuator 5 A fusing replaced the shared 8 A for selectivity). F-1001 lives off-board with a 1N4148 flyback diode across its coil. <strong>For canonical wiring, use the §9 perfboard-layout diagrams below (#2 main board, #4 fan-driver, #5 12 V power, #6 motor fuse) — not this block view.</strong>
+  <strong>Block-diagram drift (read before building from this view):</strong> the block diagram above shows the original single-board system flow. The current build is the same <em>logically</em> (same components, same signal paths) but is split across <strong>four perfboards</strong>: a main control board (ESP32 + 2× BTS7960 + BC547 + endstop headers + 4 Phoenix plugs), a fan-driver board (P55NF06L MOSFET + 220 Ω/10 kΩ gate network + RB085T-60 flyback), a 12 V power board (3 A fuse + 5 plugs distributing fused 12 V to the two external bucks plus a SCREEN+RELAY plug pair that low-side-switches the screen trigger via the F-1001 — rewired 2026-06-26), and a motor fuse board (2× 5 A fuses + 1000 µF bulk cap + P6KE15CA TVS + 3 plugs carrying the high-current BTS B+ feeds). Both LM2596 bucks are <em>standalone</em> modules, not on any perfboard. The SSR-25DA shown above was removed 2026-06-21 and replaced by the fan-driver MOSFET with PWM speed control. Per-actuator endstops + a 3.3 V rail (ESP32 AMS1117 → endstop +Vcc) were added 2026-06-23, with the BTS EN lines split (GPIO 27 → BTS #1, GPIO 19 → BTS #2) so each endstop kills its own actuator. The 12 V infrastructure was split 2026-06-24 into the two separate power/fuse boards (bulk cap + TVS migrated to the motor fuse board to sit electrically close to BTS B+; per-actuator 5 A fusing replaced the shared 8 A for selectivity). F-1001 lives off-board with a 1N4148 flyback diode across its coil. <strong>For canonical wiring, use the §9 perfboard-layout diagrams below (#2 main board, #4 fan-driver, #5 12 V power, #6 motor fuse) — not this block view.</strong>
 </div>
 
 <!-- ====================================================================== -->
@@ -3872,7 +3872,7 @@
 <!-- Thumbnail legend -->
 <div style="display:flex;flex-wrap:wrap;gap:10px;background:#fff;border:1px solid var(--divider);border-radius:8px;padding:10px 12px;margin:10px 0;font-size:11px;align-items:center;">
   <div style="display:flex;align-items:center;gap:8px;"><img src="https://m.media-amazon.com/images/I/713rFKZ+oRL._SL1500_.jpg" alt="Phoenix terminals" style="width:42px;height:42px;object-fit:contain;background:#fafaf9;border-radius:4px;"><span>Phoenix plug (2-pos)</span></div>
-  <div style="display:flex;align-items:center;gap:8px;"><img src="https://mm.digikey.com/Volume0/opasdata/d220001/derivates/1/300/281/720/MFG_LRS-100_sml.jpg" alt="Mean Well PSU" style="width:42px;height:42px;object-fit:contain;background:#fafaf9;border-radius:4px;"><span>Mean Well LRS-100-12</span></div>
+  <div style="display:flex;align-items:center;gap:8px;"><img src="https://mm.digikey.com/Volume0/opasdata/d220001/derivates/1/300/281/720/MFG_LRS-150_sml.jpg" alt="Mean Well PSU" style="width:42px;height:42px;object-fit:contain;background:#fafaf9;border-radius:4px;"><span>Mean Well LRS-150-12</span></div>
   <div style="display:flex;align-items:center;gap:8px;"><img src="https://www.progressiveautomations.com/cdn/shop/files/41be031b696edb47dc91f17ff51d08b32d3a61e6359aa3ebf55ff99759c52ee9_589a1fbd-fb1e-412f-8b3c-7c9569fa7d64.jpg?v=1780321423&amp;width=400" alt="PA-04 actuator" style="width:42px;height:42px;object-fit:contain;background:#fafaf9;border-radius:4px;"><span>PA-04 actuator × 2</span></div>
   <div style="display:flex;align-items:center;gap:8px;"><span style="display:inline-flex;width:42px;height:42px;align-items:center;justify-content:center;background:#fafaf9;border:1px solid var(--divider);border-radius:4px;font-size:20px;">⏻</span><span>Wall button</span></div>
   <div style="display:flex;align-items:center;gap:8px;"><img src="https://elitescreens.com/wp-content/uploads/VMAX2_App-700x518.jpg" alt="Elite VMAX2" style="width:42px;height:42px;object-fit:contain;background:#fafaf9;border-radius:4px;"><span>VMAX2 12 V trigger</span></div>
@@ -3899,7 +3899,7 @@
       <text x="150" y="54" text-anchor="middle" font-size="10" fill="#52525b" font-weight="600">PIN 2</text>
     </svg>
     <table style="font-size:13px;margin-top:6px;">
-      <tr><td style="width:50px;"><span style="display:inline-block;width:30px;height:6px;background:#18181b;border-radius:1px;vertical-align:middle;"></span></td><td><strong>Pin 1 · black</strong> · GND — from the future 12 V board's GND star (which itself returns to Mean Well LRS-100-12 <code>V−</code>)</td></tr>
+      <tr><td style="width:50px;"><span style="display:inline-block;width:30px;height:6px;background:#18181b;border-radius:1px;vertical-align:middle;"></span></td><td><strong>Pin 1 · black</strong> · GND — from the future 12 V board's GND star (which itself returns to Mean Well LRS-150-12 <code>V−</code>)</td></tr>
       <tr><td><span style="display:inline-block;width:30px;height:6px;background:#2563eb;border-radius:1px;vertical-align:middle;"></span></td><td><strong>Pin 2 · blue</strong> · +5 V — from the dedicated LM2596 buck on the future 12 V board (dial to 5.0 V before plugging in)</td></tr>
     </table>
   </div>
@@ -4278,7 +4278,7 @@
 
 <h3 style="margin-top:32px">12 V power board (separate small board)</h3>
 <p style="margin-top:0;font-size:14px;color:var(--muted)">
-  Tiny low-current distribution board: PSU 12 V comes in, passes through a single 3 A fast-blow fuse, and fans out to three downstream consumers via Phoenix plugs. <strong>Neither LM2596 buck lives on this board</strong> — both are standalone modules wired off-board. The 5 V output of LM2596 #1 routes directly to the main control board's 5 V IN plug; the 6.5 V output of LM2596 #2 routes directly to the fan-driver board's BUCK IN plug. This board's only job is to take one fused 12 V feed and split it three ways: to LM2596 #1's input, to LM2596 #2's input, and to the F-1001 contact-side that switches the screen's 12 V trigger.
+  Tiny low-current distribution board: PSU 12 V comes in, passes through a single 3 A fast-blow fuse, and fans out to three downstream consumers via Phoenix plugs. <strong>Neither LM2596 buck lives on this board</strong> — both are standalone modules wired off-board. The 5 V output of LM2596 #1 routes directly to the main control board's 5 V IN plug; the 6.5 V output of LM2596 #2 routes directly to the fan-driver board's BUCK IN plug. This board's only job is to take one fused 12 V feed and split it three ways: to LM2596 #1's input, to LM2596 #2's input, and to the screen's +12 V trigger leg (paired with a SCREEN ↔ RELAY plug loop that low-side-switches the screen's − return through the F-1001 contacts).
 </p>
 <p style="margin-top:6px;font-size:13px;color:var(--muted);">
   <strong>Actuator motor current does NOT pass through this board.</strong> That lives on a separate motor fuse board (Diagram #6 below). The 1000 µF bulk cap + P6KE15CA TVS also live on the motor fuse board, not here — both exist to handle BTS-side inrush + back-EMF transients and need to sit electrically close to the BTS B+ pads.
@@ -4304,6 +4304,7 @@
       .pb-lbl-pin   { font-size: 8px; font-weight: 600; fill: #18181b; text-anchor: middle; font-family: monospace; }
       .pb-tr-12v    { fill: none; stroke: #dc2626; stroke-width: 2; }
       .pb-tr-gnd    { fill: none; stroke: #18181b; stroke-width: 1.5; stroke-dasharray: 4 3; }
+      .pb-tr-sw     { fill: none; stroke: #16a34a; stroke-width: 2; }
       .pb-joint     { fill: #18181b; }
       .pb-ord       { font-size: 13px; font-weight: 700; fill: #fff; }
       .pb-ord-c     { fill: #16a34a; }
@@ -4356,17 +4357,34 @@
   </g>
   <!-- BUCK 2 OUT pin abs: (322, 94) = GND, (362, 94) = +12 V -->
 
-  <!-- SCREEN OUT (2-pos) — pin 1 = GND, pin 2 = +12 V (post-fuse) → F-1001 COM contact -->
+  <!-- SCREEN plug (2-pos) — pin 1 = SW (low-side return from RELAY plug), pin 2 = +12 V (post-fuse) -->
+  <!-- Off-board: both wires run to the screen trigger pair. pin 1 → screen −, pin 2 → screen +. -->
   <g transform="translate(420, 60)">
     <rect class="pb-phx" x="0" y="0" width="84" height="34" rx="3"/>
     <circle class="pb-phx-pin" cx="22" cy="17" r="3"/>
     <circle class="pb-phx-pin" cx="62" cy="17" r="3"/>
-    <text class="pb-lbl-sm" x="42" y="48">SCREEN OUT (GND · +12 V)</text>
-    <text class="pb-lbl-tag" x="42" y="60">to F-1001 contact-side</text>
+    <text class="pb-lbl-sm" x="42" y="48">SCREEN (SW · +12 V)</text>
+    <text class="pb-lbl-tag" x="42" y="60">to screen trigger pair</text>
     <text class="pb-lbl-pin" x="22" y="28" fill="#fff">1</text>
     <text class="pb-lbl-pin" x="62" y="28" fill="#fff">2</text>
   </g>
-  <!-- SCREEN OUT pin abs: (442, 94) = GND, (482, 94) = +12 V -->
+  <!-- SCREEN plug pin abs: (442, 94) = SW, (482, 94) = +12 V -->
+
+  <!-- RELAY plug (vertical 2-pos) — pin 1 top = SW (tied to SCREEN pin 1), pin 2 bot = GND -->
+  <!-- Off-board: both wires run to the F-1001 contact-side. pin 1 → CH1 NO, pin 2 → CH1 COM. -->
+  <!-- Sits below SCREEN plug pin 1, oriented vertically so the two off-board wires drop down. -->
+  <g transform="translate(425, 130)">
+    <rect class="pb-phx" x="0" y="0" width="34" height="84" rx="3"/>
+    <circle class="pb-phx-pin" cx="17" cy="22" r="3"/>
+    <circle class="pb-phx-pin" cx="17" cy="62" r="3"/>
+    <text class="pb-lbl-pin" x="17" y="25" fill="#fff">1</text>
+    <text class="pb-lbl-pin" x="17" y="65" fill="#fff">2</text>
+    <text class="pb-lbl-sm" x="44" y="26" text-anchor="start">RELAY pin 1 (SW)</text>
+    <text class="pb-lbl-tag" x="44" y="38" text-anchor="start">to F-1001 CH1 NO</text>
+    <text class="pb-lbl-sm" x="44" y="66" text-anchor="start">RELAY pin 2 (GND)</text>
+    <text class="pb-lbl-tag" x="44" y="78" text-anchor="start">to F-1001 CH1 COM</text>
+  </g>
+  <!-- RELAY plug pin abs: (442, 152) = SW, (442, 192) = GND -->
 
   <!-- ============ BOTTOM RAILS ============ -->
   <!-- GND rail: dashed (= back of board) one row above +12 V rail.       -->
@@ -4376,7 +4394,7 @@
   <path class="pb-rail-12v" d="M 60 400 L 510 400"/>
   <text class="pb-lbl" x="55" y="403" fill="#b91c1c" text-anchor="end" style="font-size:11px;">+12 V (post-fuse)</text>
 
-  <!-- ============ GND DROPS (all 4 plugs, dashed = back of board) ============ -->
+  <!-- ============ GND DROPS (PSU IN · BUCK 1 OUT · BUCK 2 OUT · RELAY pin 2, dashed = back of board) ============ -->
   <!-- PSU IN pin 1 (GND) → GND rail -->
   <path class="pb-tr-gnd" d="M 82 94 L 82 386"/>
   <circle class="pb-joint" cx="82" cy="386" r="2"/>
@@ -4386,8 +4404,10 @@
   <!-- BUCK 2 OUT pin 1 (GND) → GND rail -->
   <path class="pb-tr-gnd" d="M 322 94 L 322 386"/>
   <circle class="pb-joint" cx="322" cy="386" r="2"/>
-  <!-- SCREEN OUT pin 1 (GND) → GND rail -->
-  <path class="pb-tr-gnd" d="M 442 94 L 442 386"/>
+  <!-- SCREEN pin 1 → RELAY pin 1 (switched node, green = post-relay return path) -->
+  <path class="pb-tr-sw" d="M 442 94 L 442 152"/>
+  <!-- RELAY pin 2 (GND) → GND rail -->
+  <path class="pb-tr-gnd" d="M 442 192 L 442 386"/>
   <circle class="pb-joint" cx="442" cy="386" r="2"/>
 
   <!-- ============ +12 V (POST-FUSE) DROPS TO RAIL ============ -->
@@ -4397,7 +4417,7 @@
   <!-- BUCK 2 OUT pin 2 → +12 V rail -->
   <path class="pb-tr-12v" d="M 362 94 L 362 400"/>
   <circle class="pb-joint" cx="362" cy="400" r="2"/>
-  <!-- SCREEN OUT pin 2 → +12 V rail -->
+  <!-- SCREEN pin 2 → +12 V rail (always-on +12 V to screen + trigger) -->
   <path class="pb-tr-12v" d="M 482 94 L 482 400"/>
   <circle class="pb-joint" cx="482" cy="400" r="2"/>
 
@@ -4451,7 +4471,7 @@
 </div>
 
 <p style="margin-top:6px;font-size:13px;color:var(--muted);">
-  <strong>How to read this:</strong> same convention as the fan-driver board — solid lines run on the top side of the board (red = +12 V), dashed lines run on the back side (GND returns). The 3 A fuse holder sits between PSU IN pin 2 (raw +12 V) and the +12 V rail; everything downstream of the rail (BUCK 1 OUT pin 2, BUCK 2 OUT pin 2, SCREEN OUT pin 2) is fuse-protected. <strong>Leave the 3 A fuse cartridge OUT of the holder until all soldering + multimeter checks are complete</strong> — pulling the cartridge isolates the board's input for safe continuity testing.
+  <strong>How to read this:</strong> same convention as the fan-driver board — solid lines run on the top side of the board (red = +12 V, green = the switched SCREEN↔RELAY node), dashed lines run on the back side (GND returns). The 3 A fuse holder sits between PSU IN pin 2 (raw +12 V) and the +12 V rail; everything downstream of the rail (BUCK 1 OUT pin 2, BUCK 2 OUT pin 2, SCREEN pin 2) is fuse-protected. The new vertical RELAY plug sits directly below SCREEN pin 1 — pin 1 (top) is the switched-node tie to SCREEN pin 1, pin 2 (bottom) drops to the GND rail. <strong>Leave the 3 A fuse cartridge OUT of the holder until all soldering + multimeter checks are complete</strong> — pulling the cartridge isolates the board's input for safe continuity testing.
 </p>
 
 <h4 style="margin:20px 0 8px;font-size:15px;">12 V power board wire list</h4>
@@ -4471,19 +4491,36 @@
     </tr>
     <tr>
       <td><strong style="color:#b91c1c;">+12</strong></td>
-      <td>3 A fuse holder bottom pad → +12 V rail → BUCK 1 OUT plug pin 2 + BUCK 2 OUT plug pin 2 + SCREEN OUT plug pin 2 <em>(single rail trace, three plug taps)</em></td>
+      <td>3 A fuse holder bottom pad → +12 V rail → BUCK 1 OUT plug pin 2 + BUCK 2 OUT plug pin 2 + SCREEN plug pin 2 <em>(single rail trace, three plug taps)</em></td>
       <td>red</td>
     </tr>
     <tr>
       <td><strong>GND</strong></td>
-      <td>GND rail → PSU IN plug pin 1 + BUCK 1 OUT plug pin 1 + BUCK 2 OUT plug pin 1 + SCREEN OUT plug pin 1 <em>(local star return; one wire from PSU IN pin 1 lands at the Mean Well LRS-100-12 V− terminal)</em></td>
+      <td>GND rail → PSU IN plug pin 1 + BUCK 1 OUT plug pin 1 + BUCK 2 OUT plug pin 1 + RELAY plug pin 2 <em>(local star return; one wire from PSU IN pin 1 lands at the Mean Well LRS-150-12 V− terminal)</em></td>
       <td>black</td>
+    </tr>
+    <tr>
+      <td><strong style="color:#15803d;">SW</strong></td>
+      <td>SCREEN plug pin 1 ↔ RELAY plug pin 1 <em>(short vertical trace — the switched node. When F-1001 CH1 closes, this node is pulled to GND through the relay, energizing the screen trigger.)</em></td>
+      <td>green</td>
     </tr>
   </tbody>
 </table>
 
 <div class="notes" style="margin-top:10px;">
-  <strong>Off-board hookup:</strong> the two BUCK OUT plugs feed the <em>inputs</em> of the two standalone LM2596 modules — wire each plug to its buck's IN+ / IN− pads. The bucks' OUT+ wires then go directly to their consumer board: LM2596 #1 OUT+ (dialed to 5.0 V before connecting) lands on the main control board's 5 V IN plug pin 2; LM2596 #2 OUT+ (dialed to 6.5 V before connecting) lands on the fan-driver board's BUCK IN plug pin 2. Each buck's OUT− returns to that consumer board's GND pin. The <strong>SCREEN OUT</strong> plug carries the screen-trigger pair: <strong>pin 2 (+12 V)</strong> → F-1001 CH1 COM contact screw → through CH1 NO contact (when relay coil energized) → screen's +12 V trigger wire (existing run to the VMAX2); <strong>pin 1 (GND)</strong> → screen's 12 V trigger GND return wire (paired with the +12 V leg, runs alongside it to the screen). The GND leg is always-on (not switched by the relay) — only the +12 V leg passes through the F-1001 contacts.
+  <strong>Off-board hookup:</strong> the two BUCK OUT plugs feed the <em>inputs</em> of the two standalone LM2596 modules — wire each plug to its buck's IN+ / IN− pads. The bucks' OUT+ wires then go directly to their consumer board: LM2596 #1 OUT+ (dialed to 5.0 V before connecting) lands on the main control board's 5 V IN plug pin 2; LM2596 #2 OUT+ (dialed to 6.5 V before connecting) lands on the fan-driver board's BUCK IN plug pin 2. Each buck's OUT− returns to that consumer board's GND pin.
+  <br><br>
+  The <strong>SCREEN plug</strong> and <strong>RELAY plug</strong> split the F-1001 wiring into two clean cable runs — one to the screen, one to the relay — by doing <strong>low-side switching</strong> of the screen trigger:
+  <ul style="margin:6px 0 0 18px;padding:0;">
+    <li><strong>SCREEN plug → screen trigger pair</strong> (existing run to the VMAX2): <strong>pin 1 (SW)</strong> → screen's <strong>−</strong> trigger; <strong>pin 2 (+12 V)</strong> → screen's <strong>+</strong> trigger.</li>
+    <li><strong>RELAY plug → F-1001 CH1 contact-side</strong> (short hop to the off-board relay): <strong>pin 1 (SW)</strong> → CH1 <strong>NO</strong> screw; <strong>pin 2 (GND)</strong> → CH1 <strong>COM</strong> screw.</li>
+  </ul>
+  <br>
+  How the circuit fires: screen + sees +12 V always (SCREEN pin 2 ← +12 V rail, direct). Screen − floats until the F-1001 coil energizes — at that moment CH1 COM (GND, via RELAY pin 2) connects to CH1 NO (the SW node, via RELAY pin 1 ↔ SCREEN pin 1 board trace), which yanks screen − down to GND. +12 V across the trigger pair = screen drops. When the coil de-energizes, NO floats, screen − floats, screen retracts.
+  <br><br>
+  <strong>Why the swap from the original high-side design:</strong> in the original wiring the relay sat between the +12 V rail and the screen + wire, and a GND wire ran alongside it as a passthrough. That left one orphan wire (GND) wandering through the relay area with no plug terminus. Splitting into SCREEN plug (always-on pair to screen) + RELAY plug (switched pair to F-1001) gives each plug a single destination and lets the GND rail terminate cleanly on a board pad.
+  <br><br>
+  <strong>Caution — confirm screen trigger isolation before powering up:</strong> low-side switching only works if the screen's <strong>−</strong> trigger input is electrically isolated inside the screen (high-impedance input, optocoupler, or floating reference). Most motorized screens that mate with AVR trigger jacks <em>are</em> isolated, but if the screen ties its trigger <strong>−</strong> to chassis GND internally, the relay will have no effect (screen − will always be at GND through that chassis path). Quick check before final wiring: with the screen powered and disconnected from this board, measure resistance between the screen's trigger <strong>−</strong> terminal and the screen's chassis. <em>Open</em> (or very high) = isolated, low-side switching will work. <em>Continuity</em> = the screen ties − to chassis; in that case swap to a high-side design (SCREEN pin 2 to relay COM, RELAY pin 1 to screen +, RELAY pin 2 stays GND but wires to screen −).
 </div>
 
 <div class="notes" style="margin-top:10px;">
@@ -4491,7 +4528,7 @@
 </div>
 
 <div class="notes" style="margin-top:10px;background:#fefce8;border-color:#fde047;">
-  <strong>PSU V+ / V− split point (read once, applies to both 12 V power board AND motor fuse board):</strong> the Mean Well LRS-100-12 has one V+ screw terminal and one V− screw terminal, but two boards need 12 V. Pick one:
+  <strong>PSU V+ / V− split point (read once, applies to both 12 V power board AND motor fuse board):</strong> the Mean Well LRS-150-12 has one V+ screw terminal and one V− screw terminal, but two boards need 12 V. Pick one:
   <ul style="margin:4px 0 0 18px;padding:0;font-size:13px;">
     <li><strong>Pigtail method (preferred):</strong> twist two ~18 AWG wire tails together at the V+ screw and clamp both under the terminal; same at V−. One tail per board's PSU IN plug. Solid, low-impedance, no extra hardware.</li>
     <li><strong>Wago 221 lever-nut method:</strong> one 18 AWG from V+ to a 3-port Wago, then two 18 AWG out (one per board). Same at V−. Easier service, slightly more impedance.</li>
@@ -5580,7 +5617,7 @@ Wall button state model stays in sync
   <li>On-site measurements taken: 16'5" throw, 104" lens, 39" screen bottom, 120" 16:9 VMAX2 confirmed</li>
   <li>Projector chosen: Epson PowerLite L730U ($3,799, Office Wonderland) — fallback L790U if stock dries</li>
   <li>Screen: <strong>keep existing Elite VMAX2 120" 16:9</strong> — TT3 125" upgrade briefly scoped 2026-06-09 then reverted; 10+ yr proven fiberglass-backed MaxWhite stays, manual tensioner workflow continues</li>
-  <li>Control architecture: 2× BTS7960 (one per actuator, per-side current sensing) + ESP32-DevKitC + Mean Well LRS-100-12 + 2× PA-04-8-100 actuators, perfboard build with female pin sockets + Phoenix-style pluggable terminals for external connections</li>
+  <li>Control architecture: 2× BTS7960 (one per actuator, per-side current sensing) + ESP32-DevKitC + Mean Well LRS-150-12 + 2× PA-04-8-100 actuators, perfboard build with female pin sockets + Phoenix-style pluggable terminals for external connections</li>
   <li>Bracket choice locked: 4× BRK-01 T-bracket (fits both PA-04 ends)</li>
   <li>Box rebuild: we design, Dad helps build (carpentry assistance, ownership is ours)</li>
   <li>BOM fully linked: every line item has an Amazon URL + exact price in the Purchase Summary at top</li>
@@ -5603,7 +5640,7 @@ Wall button state model stays in sync
     <ul style="margin:6px 0 0 18px;padding:0;font-size:13px;color:var(--muted);">
       <li><strong>Main control board</strong> (7×9 cm, Diagram #2) — 2× BTS7960 sockets stacked at the top, 2× Prusa endstop headers + BC547 + 1 kΩ in a vertical stack in the middle, ESP32 socket on the right, 4× Phoenix plugs along the left edge (5 V IN · BUTTON · SCREEN · FAN SIG), and three horizontal busses at the bottom (3.3 V · GND · 5 V).</li>
       <li><strong>Fan-driver board</strong> (5×7 cm, Diagram #4) — P55NF06L MOSFET + 220 Ω gate resistor + 10 kΩ pulldown + RB085T-60 flyback + 3 plugs (BUCK IN · SIG IN · FAN OUT).</li>
-      <li><strong>12 V power board</strong> (5×7 cm, Diagram #5) — 3 A fuse holder + 4 plugs (PSU IN · BUCK 1 OUT · BUCK 2 OUT · SCREEN OUT). Distributes one fused 12 V feed to the two external bucks and the F-1001 contact-side.</li>
+      <li><strong>12 V power board</strong> (5×7 cm, Diagram #5) — 3 A fuse holder + 5 plugs (PSU IN · BUCK 1 OUT · BUCK 2 OUT · SCREEN · RELAY). Distributes one fused 12 V feed to the two external bucks and to the screen/relay pair (low-side switching of the screen − return via the F-1001).</li>
       <li><strong>Motor fuse board</strong> (5×7 cm, Diagram #6) — 2× 5 A fuse holders + 1000 µF bulk cap + P6KE15CA TVS + 3 plugs (PSU IN · BTS #1 OUT · BTS #2 OUT). Per-actuator fusing with bulk-cap inrush smoothing + TVS clamp sitting close to the BTS B+ pads.</li>
     </ul>
     Both LM2596 bucks are standalone modules — neither lives on a perfboard. Dial each to its target output voltage (5.0 V for #1 to main, 6.5 V for #2 to fan-driver) <em>before</em> wiring into the system; an unconfigured LM2596 can ship at anywhere from 1.25 V to nearly Vin. After soldering each board, leave the fuse cartridges out of their holders during multimeter continuity testing — it isolates the input for safe probing.</li>
