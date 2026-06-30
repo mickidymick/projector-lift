@@ -919,7 +919,7 @@
       </div>
       <div class="info">
         <div class="name">BTS7960 / IBT-2 H-bridge module (4-pack) <span style="color:var(--muted);font-weight:400;font-size:12px">— hiBCTR</span></div>
-        <div class="desc">One module per actuator — each PA-04 gets its own H-bridge for independent current sensing and per-actuator stall detection. Both modules share the same logical PWM + direction signals from the ESP32, so they move in sync, but each reports its own current draw. Direction + PWM soft-start + over-current/temp/under-voltage protection on each. 43A capacity is wild overkill for our ~5A draw. 4-pack gives 2 spares.</div>
+        <div class="desc">One module per actuator — each PA-04 gets its own H-bridge so endstops can cut its EN independently during OPENING (first side to trip stops, the other side keeps moving until its own endstop trips). The R_IS pin on each module also feeds the ESP32 ADC so CLOSING can be ended by "current dropped to ~0" on both sides when the PA-04 internal limits open the motor circuits. Direction + PWM soft-start + over-current/temp/under-voltage protection on each. 43A capacity is wild overkill for our ~5A draw. 4-pack gives 2 spares.</div>
       </div>
       <div class="side">
         <div class="price-line">$22.99<span class="unit">4-pack</span></div>
@@ -947,7 +947,7 @@
       </div>
       <div class="info">
         <div class="name">Square D X-Series momentary rocker switch <span style="color:var(--muted);font-weight:400;font-size:12px">(SQR14106WH · 1-gang · matte white · UL listed)</span></div>
-        <div class="desc">Wall-mounted mode lever for INDOOR/OUTDOOR switching. Momentary action (press → contact closes → ESP32 GPIO pulled to GND through internal pull-up → state machine sees one press event; release → returns to neutral) is exactly the right behavior for a toggle-driven mode lever — no risk of getting stuck in a half-state on power cycle, no need to read a maintained position. 15 A / 120-277 V AC rating is overkill here (we're only switching a logic-level signal at &lt;1 mA), but the contacts work the same regardless of voltage. Modular face plate lets the parents swap rocker color later without rewiring. Replaces the original reused wall button — fresh part means clean contact bounce profile (the firmware's <code>delayed_on/off: 30 ms</code> debounce was tuned against the aged button and the new switch may want re-tuning at install).</div>
+        <div class="desc">Wall-mounted single-button control for the lift. Momentary action (press → contact closes → ESP32 GPIO pulled to GND through internal pull-up → firmware sees one press event; release → returns to neutral) is what makes the single-button dispatch work — each press is an event the firmware can route based on current endstop state (both deployed-end endstops tripped ⇒ CLOSE, otherwise ⇒ OPEN), and there's no maintained position to drift out of sync with the lift's actual state when remote/voice control fires the same actions. 15 A / 120-277 V AC rating is overkill here (we're only switching a logic-level signal at &lt;1 mA), but the contacts work the same regardless of voltage. Modular face plate lets the parents swap rocker color later without rewiring. Replaces the original maintained-toggle wall switch — fresh part means clean contact bounce profile (the firmware's <code>delayed_on/off: 30 ms</code> debounce may want re-tuning at install). Drops into the existing single-gang opening using the existing 2-wire run back to the lift box.</div>
       </div>
       <div class="side">
         <div class="price-line">$11.10</div>
@@ -1316,20 +1316,6 @@
       <div class="side">
         <div class="price-line">$12.99<span class="unit">4-pack</span></div>
         <a class="buy-link" href="https://www.amazon.com/Essmetuin-Soldering-Electronics-soldering-Electrical/dp/B0C2L478LM" target="_blank" rel="noopener">Buy on Amazon</a>
-      </div>
-    </li>
-
-    <li>
-      <div class="thumb">
-        <span style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;background:#fafaf9;border-radius:4px;font-size:11px;font-family:ui-sans-serif,system-ui;color:#1f2937;font-weight:700;text-align:center;line-height:1.1;">Leviton<br>5655-2W</span>
-      </div>
-      <div class="info">
-        <div class="name">Leviton 5655-2W momentary Decora wall switch <span style="color:var(--muted);font-weight:400;font-size:12px">single-pole · 15 A / 120-277 V · commercial spec · white</span></div>
-        <div class="desc">Replaces the existing maintained-toggle wall switch in the porch gang box. Standard Decora form factor — drops into the existing single-gang opening and faceplate. Single-pole momentary: each press closes once and spring-returns to off, exactly two terminals. <strong>Why the swap:</strong> a momentary press becomes an event the firmware can dispatch on (single tap → open or close based on endstop state), instead of a maintained state that fights remote/voice control whenever the wall switch position drifts out of sync with the lift's actual position. <strong>Constraint:</strong> only 2 wires run to the gang box, so a 3-conductor SPDT center-off (Leviton 5657) isn't an option. Existing in-wall 2-wire run is reused as the signal pair back to the ESP32's GPIO 18 (switch-to-GND, INPUT_PULLUP). The Decora rocker is rated for 120-277 V mains but works fine as a low-voltage signal switch; we're using a tiny fraction of its contact rating.</div>
-      </div>
-      <div class="side">
-        <div class="price-line">$17.97</div>
-        <a class="buy-link" href="https://www.homedepot.com/p/Leviton-15-Amp-120-277-VAC-Decora-Plus-Single-Pole-Rocker-Light-Switch-Momentary-Contact-Commercial-Specification-White-5655-2W/308986534" target="_blank" rel="noopener">Buy at Home Depot</a>
       </div>
     </li>
 
@@ -2441,8 +2427,8 @@
 <h3 style="margin-top:28px">Reused from the existing system</h3>
 <ul class="reuse-grid">
   <li>
-    <strong>Wall button</strong>
-    <span class="role">Sole user control — debounced → toggle direction state machine</span>
+    <strong>Wall switch gang box + 2-wire run</strong>
+    <span class="role">Existing single-gang opening, faceplate, and the 2-conductor run back to the box are reused — only the switch insert is new (Square D X-Series SQR14106WH momentary rocker, in the BOM). The old maintained-toggle switch comes out; the gang box and wires stay. Two-wire constraint is what forced the single-pole momentary choice (a 3-conductor SPDT center-off would have been ideal for explicit UP/DOWN at the wall but isn't feasible without pulling new romex).</span>
   </li>
   <li>
     <strong>IR repeater</strong>
@@ -2458,11 +2444,11 @@
   </li>
   <li>
     <strong>Drawer slides (4×)</strong>
-    <span class="role">Confirmed rated for the new L730U load. Constrain the box to vertical-only motion — mechanically absorbs any small actuator sync drift. Extend only ~7.25", so each slide gets its own endstop to cut the actuator on that side before the slide's hard stop hits (see §8 drawer-slide overrun protection).</span>
+    <span class="role">Confirmed rated for the new L730U load. Constrain the box to vertical-only motion — mechanically absorbs any small actuator sync drift. Extend only ~7.25"; the deployed-end endstops (below) trip at the chosen lowest-travel position before the slides reach their hard stops.</span>
   </li>
   <li>
     <strong>Prusa endstops (2×)</strong>
-    <span class="role">Reused from a retired Prusa MK3 — mechanical microswitch on a 3-pin PCB with onboard LED. One per slide, lever positioned ~¼" before the slide's full-extension stop. Each endstop drops the EN line on its own BTS7960 → that actuator stops immediately while the other keeps moving until its own endstop trips. Drift can't accumulate (both endpoints hard-defined). See §8 + §9.</span>
+    <span class="role">Reused from a retired Prusa MK3 — mechanical microswitch on a 3-pin PCB with onboard LED. Mounted on the main box walls at the chosen deployed (lowest-travel) position; a small bracket on the top of the inner box trips both as the box descends. Each endstop drops the EN line on its own BTS7960 → that actuator stops immediately while the other keeps moving until its own endstop trips. Drift can't accumulate (extend endpoint hard-defined by the endstops, retract endpoint by the PA-04 internal limits). See §8 + §9.</span>
   </li>
   <li>
     <strong>Elite VMAX2 120" 16:9 screen</strong>
@@ -2503,7 +2489,7 @@
   <span class="label">Inputs</span>
   <p class="why">Floating, noisy, or un-debounced inputs cause phantom button presses, ISR storms, and lock-ups.</p>
   <ul>
-    <li><strong>Software debounce on the wall button:</strong> ESP32 internal pull-up + ESPHome's <code>binary_sensor</code> with <code>delayed_on: 30ms</code> / <code>delayed_off: 30ms</code> filters. Hardware RC debounce is unnecessary when the firmware handles it cleanly.</li>
+    <li><strong>Software debounce on the momentary wall switch:</strong> ESP32 internal pull-up + ESPHome's <code>binary_sensor</code> with <code>delayed_on: 30ms</code> / <code>delayed_off: 30ms</code> filters. Hardware RC debounce is unnecessary when the firmware handles it cleanly. Each press fires once on the rising edge of <code>on_press</code>; the release is ignored.</li>
     <li><strong>Shielded or twisted-pair wire</strong> for any input run over ~3 ft (wall button, BTS7960 R_IS / L_IS current-sense lines). Tie shield to logic GND at the MCU end only — never both ends.</li>
   </ul>
 </div>
@@ -2516,19 +2502,70 @@
     <li><strong>Never use blocking <code>delay()</code></strong> in <code>loop()</code>. Drive the state machine with <code>millis()</code> deltas so the button is read every iteration.</li>
     <li><strong>Mark all ISR-shared variables <code>volatile</code></strong> — don't let the compiler optimize away updates from interrupt context.</li>
     <li><strong>Enforce BTS7960 deadtime</strong> (~50 ms minimum between direction reversals) — a shoot-through pulse generates EMI identical to half-suppressed kickback.</li>
-    <li><strong>Current-sense thresholds calibrated to the actuators</strong>: read normal running current first, set "end-of-travel" trigger at ~10% of running current (motor disconnected via internal limit), and "stall" trigger at ~2× running current. Tune empirically with the actual PA-04s on the bench before final install.</li>
-    <li><strong>Reverse-on-stall during descent</strong>: if stall detected while extending (box dropping), reverse direction for 1–2 sec instead of just cutting power. Garage-door-style obstruction safety. Single-line code change in the state machine, big safety upside.</li>
+    <li><strong>End-of-travel threshold calibrated to the actuators</strong>: read normal running current first, set the "end-of-travel" threshold somewhere comfortably above the noise floor but below the lowest "running" reading you ever see (0.1–0.3 V is the usual band on R_IS / L_IS). Until the IS-pin pulldown mod (next card) is installed, the high end of the IS range saturates the ADC at the on-module 10 kΩ pulldown — that's fine; current-drop detection only needs the low end, which reads cleanly. Tune empirically with the real PA-04s on the bench.</li>
+    <li><strong>Stall detection re-enable plan:</strong> see the next card (<em>IS-pin pulldown + filter mod</em>). Mod installs 4× 1 kΩ + 4× 100 nF to rescale IS-pin voltage into the ESP32 ADC window so running / stall / EOT bands become discriminable instead of all saturating at the rail. Until then the firmware uses only the current-drop EOT signal (PA-04 internal-limit fires → IS-pin voltage collapses to ~0) plus the <code>Travel safety timeout</code> as the failsafe.</li>
   </ul>
 </div>
 
 <div class="card">
-  <span class="label">Drawer-slide overrun protection</span>
-  <p class="why">The PA-04s have an 8" stroke; the reused drawer slides only extend ~7.25". Without an external limit, the actuators would push the slides ¾" past their hard stops and tear them apart. Current sensing alone won't catch this in time — stamped-steel slide stops bend at lower force than the actuators draw in normal acceleration.</p>
+  <span class="label">IS-pin pulldown + filter mod (current-sensing rescale)</span>
+  <p class="why">The BTS7960 module's on-board 10 kΩ pulldown on each IS pin is sized for the chip's max ~43 A rating. At our actual ~4–12 A operating range the IS pin saturates the ESP32's 3.3 V ADC any time the motor is drawing meaningful current — so "running", "stall", and "EOT" all look identical (≈ rail). Drop a 1 kΩ to GND in parallel with the on-module 10 kΩ and the effective pulldown becomes ~909 Ω; current scales linearly into the 0–3.3 V ADC window so the three bands become individually readable. A 100 nF cap in parallel filters the PWM commutation transients (τ ≈ 90 µs at 20 kHz PWM — passes the motor's slow load envelope, blocks the per-period kick).</p>
   <ul>
-    <li><strong>One Prusa endstop per slide, independent per-actuator cutoff.</strong> Each endstop wires to its own ESP32 GPIO (<code>INPUT_PULLUP</code>, switch-to-GND). When endstop A trips, firmware drops EN on BTS7960 #1 only → actuator A's outputs go hi-Z and the PA-04's worm gear holds position rigidly while actuator B keeps extending until its own endstop trips. Both endpoints are hard-defined (endstops on extend, PA-04 internal limits on retract), so sync drift cannot accumulate across cycles.</li>
+    <li><strong>BOM (already on-hand 2026-06-30 from BOJACK + ALLECIN kits):</strong> 4× 1 kΩ axial ¼ W carbon-film resistor (one per IS pin), 4× 100 nF / 50 V ceramic disc cap (one per IS pin).</li>
+    <li><strong>Per-channel wiring</strong> — one R and one C from each IS pin to logic GND. All 4 channels (GPIO 32 / 33 / 34 / 35) get the identical treatment. The on-module 10 kΩ stays in place — we're adding in parallel, not replacing.</li>
+  </ul>
+  <svg viewBox="0 0 520 230" style="display:block;margin:1rem auto;max-width:520px;background:#fafaf9;border-radius:6px;border:1px solid #e5e7eb;font-family:ui-monospace,monospace;font-size:11px;">
+    <!-- left node: BTS IS pin -->
+    <text x="20" y="92" fill="#374151" font-weight="600">BTS7960 #n</text>
+    <text x="20" y="108" fill="#6b7280">R_IS or L_IS pin</text>
+    <!-- right node: ESP32 GPIO -->
+    <text x="500" y="92" text-anchor="end" fill="#374151" font-weight="600">ESP32 GPIO 3x</text>
+    <text x="500" y="108" text-anchor="end" fill="#6b7280">(ADC input)</text>
+    <!-- signal line -->
+    <line x1="100" y1="100" x2="420" y2="100" stroke="#0f172a" stroke-width="2"/>
+    <!-- junction dots -->
+    <circle cx="220" cy="100" r="3" fill="#0f172a"/>
+    <circle cx="300" cy="100" r="3" fill="#0f172a"/>
+    <!-- R branch -->
+    <line x1="220" y1="100" x2="220" y2="130" stroke="#0f172a" stroke-width="2"/>
+    <rect x="200" y="130" width="40" height="16" fill="#fff" stroke="#0f172a" stroke-width="2"/>
+    <text x="220" y="142" text-anchor="middle" fill="#374151">1 kΩ</text>
+    <line x1="220" y1="146" x2="220" y2="180" stroke="#0f172a" stroke-width="2"/>
+    <!-- C branch (cap plates) -->
+    <line x1="300" y1="100" x2="300" y2="130" stroke="#0f172a" stroke-width="2"/>
+    <line x1="282" y1="132" x2="318" y2="132" stroke="#0f172a" stroke-width="3"/>
+    <line x1="282" y1="142" x2="318" y2="142" stroke="#0f172a" stroke-width="3"/>
+    <text x="300" y="160" text-anchor="middle" fill="#374151">100 nF</text>
+    <line x1="300" y1="142" x2="300" y2="180" stroke="#0f172a" stroke-width="2"/>
+    <!-- GND rail -->
+    <line x1="180" y1="180" x2="340" y2="180" stroke="#0f172a" stroke-width="2"/>
+    <!-- GND symbol -->
+    <line x1="240" y1="180" x2="280" y2="180" stroke="#0f172a" stroke-width="3"/>
+    <line x1="248" y1="186" x2="272" y2="186" stroke="#0f172a" stroke-width="2"/>
+    <line x1="254" y1="192" x2="266" y2="192" stroke="#0f172a" stroke-width="2"/>
+    <text x="260" y="210" text-anchor="middle" fill="#6b7280">logic GND</text>
+    <!-- annotation: on-module pulldown stays -->
+    <text x="20" y="155" fill="#9ca3af" font-style="italic">on-module 10 kΩ pulldown</text>
+    <text x="20" y="168" fill="#9ca3af" font-style="italic">stays — we add in parallel</text>
+    <!-- channel-count tag -->
+    <text x="500" y="200" text-anchor="end" fill="#6b7280">×4 — one per IS pin</text>
+  </svg>
+  <ul>
+    <li><strong>Physical placement</strong> — easiest is solder both components on the back of the main perfboard, axial leads bridging the BTS-socket IS-pin pad and the nearest GND pad. R and C can share the same two through-holes (twist their leads together at each end before soldering) since they're in parallel. Keep the leads short (under ~½") to minimize loop area picking up motor-switching radiation.</li>
+    <li><strong>Expected voltages post-mod</strong> (BTS7960 k<sub>ILIS</sub> ≈ 8500, R<sub>eff</sub> = 1 k || 10 k = 909 Ω): 4 A → ~0.43 V (running idle), 12 A → ~1.28 V (full-load running), 20 A → ~2.14 V (stall lower), 30 A → ~3.21 V (stall upper, near rail). EOT signal stays at ~0 V — well below any running reading.</li>
+    <li><strong>Calibrate after install:</strong> bench-run each actuator unloaded, log the steady-state IS voltage during cruise → that's your noise-floor. Set <code>eot_v</code> at ~½ of that floor (well above 0, well below cruise). Stall threshold goes ~30 % below the lower stall bound (i.e., ~1.5 V) — measure first, threshold second, never the other way around.</li>
+    <li><strong>Validation after install:</strong> re-run the temporary endstop test cycles (no change expected — the mod is on a different signal path), then a full open / close cycle and confirm L_IS-drop fires the open_lift EOT cleanly and R_IS-drop still fires close_lift cleanly. Only then re-enable stall detection in firmware.</li>
+  </ul>
+</div>
+
+<div class="card">
+  <span class="label">Deployed-position endstops (also slide-overrun protection)</span>
+  <p class="why">The PA-04s have an 8" stroke; the reused drawer slides only extend ~7.25". Without an external limit, the actuators would push the slides ¾" past their hard stops and tear them apart. Current sensing alone won't catch this in time — stamped-steel slide stops bend at lower force than the actuators draw in normal acceleration. The endstops do double duty here: they define the deployed (lowest-travel) position <em>and</em> protect the slides from overrun, because the chosen deployed position is set above the slide hard stops.</p>
+  <ul>
+    <li><strong>Two Prusa endstops, mounted on the main box walls, tripped by a bracket on the inner box.</strong> Each endstop wires to its own ESP32 GPIO (<code>INPUT_PULLUP</code>, switch-to-GND). When endstop A trips, firmware drops EN on BTS7960 #1 only → actuator A's outputs go hi-Z and the PA-04's worm gear holds position rigidly while actuator B keeps extending until its own endstop trips. Both endpoints are hard-defined (external endstops on extend, PA-04 internal limits on retract), so sync drift cannot accumulate across cycles.</li>
     <li><strong>Split the BTS7960 EN lines.</strong> Originally ganged on GPIO27. Change to <code>GPIO27 → BTS7960 #1 EN</code> and <code>GPIO19 → BTS7960 #2 EN</code>. PWM lines stay ganged (same duty to both modules); the per-module EN drop is what gives independent cutoff. Hi-Z disable on EN = no current to motor regardless of PWM duty.</li>
-    <li><strong>Endstop GPIOs:</strong> <code>GPIO23 ← endstop A (slide A side)</code>, <code>GPIO22 ← endstop B (slide B side)</code>. Use NO contacts to GND; tie the Prusa board's LED+ pin to the perfboard's <strong>3.3 V rail</strong> (tapped from ESP32's onboard AMS1117 output, i.e. the 3V3 pin), <em>not</em> the 5 V rail. The Prusa board can present its VCC back onto SIG via its LED/pull-up network, and pulling SIG to 5 V would exceed the ESP32 GPIO's 3.6 V max input and damage the chip. The LED runs slightly dimmer at 3.3 V but still gives a clear "extended" indicator. Run the SIG/GND pair as a twisted pair with the wall-button input — same noise environment.</li>
-    <li><strong>Mount geometry:</strong> position the endstop lever to trip when the slide is ~¼" before its mechanical hard stop. That ¼" margin covers actuator coast after EN drop (PA-04 has minimal coast — worm gear is non-back-drivable — but leave the margin anyway).</li>
+    <li><strong>Endstop GPIOs:</strong> <code>GPIO23 ← endstop A</code>, <code>GPIO22 ← endstop B</code>. Use NO contacts to GND; tie the Prusa board's LED+ pin to the perfboard's <strong>3.3 V rail</strong> (tapped from ESP32's onboard AMS1117 output, i.e. the 3V3 pin), <em>not</em> the 5 V rail. The Prusa board can present its VCC back onto SIG via its LED/pull-up network, and pulling SIG to 5 V would exceed the ESP32 GPIO's 3.6 V max input and damage the chip. The LED runs slightly dimmer at 3.3 V but still gives a clear "tripped" indicator. Run the SIG/GND pair as a twisted pair with the wall-button input — same noise environment.</li>
+    <li><strong>Mount geometry:</strong> mount each endstop body to an inside wall of the main box; mount a small bracket on the top of the inner box positioned to trip both endstop levers when the inner box reaches the chosen deployed (lowest-travel) position. That position must sit at least ~¼" above each slide's mechanical hard stop so a touch of actuator coast (negligible — PA-04's worm gear is non-back-drivable) can't drive the slide into its stop.</li>
     <li><strong>Time-based watchdog independent of endstops.</strong> Start a timer on every extend command. If both endstops haven't tripped by T+~13 s (PA-04 ~0.6"/sec × 8" + margin), fault: drop both EN lines and require a manual button press to re-arm. Catches a dead switch, broken signal wire, or wedged lever before the side without a working endstop runs to its internal 8" limit and shreds the slide.</li>
     <li><strong>Log trip-delta per cycle.</strong> Record <code>t_B_trip − t_A_trip</code> and publish via ESPHome. A consistent and growing delta is the early warning that one actuator is aging — fix it before racking gets ugly. Small per-cycle deltas (&lt; ½ sec) are normal and self-correct at the endstops.</li>
   </ul>
@@ -2774,7 +2811,7 @@
   <div style="display:flex;align-items:center;gap:8px;"><img src="https://m.media-amazon.com/images/I/61OSF51MAiL._SL1001_.jpg" alt="LM2596" style="width:42px;height:42px;object-fit:contain;background:#fafaf9;border-radius:4px;"><span>LM2596 (12 V → 5 V)</span></div>
   <div style="display:flex;align-items:center;gap:8px;"><img src="https://m.media-amazon.com/images/I/61rc7m9vEcL._SL1500_.jpg" alt="BC547" style="width:42px;height:42px;object-fit:contain;background:#fafaf9;border-radius:4px;"><span>BC547 + 1 kΩ</span></div>
   <div style="display:flex;align-items:center;gap:8px;"><span style="display:inline-flex;width:42px;height:42px;align-items:center;justify-content:center;background:#fafaf9;border:1px solid var(--divider);border-radius:4px;font-size:11px;font-family:monospace;color:#1f2937;font-weight:700;">P55<br>NF06L</span><span>IRLZ44N MOSFET</span></div>
-  <div style="display:flex;align-items:center;gap:8px;"><span style="display:inline-flex;width:42px;height:42px;align-items:center;justify-content:center;background:#fafaf9;border:1px solid var(--divider);border-radius:4px;font-size:20px;">⏻</span><span>Wall button (reuse)</span></div>
+  <div style="display:flex;align-items:center;gap:8px;"><span style="display:inline-flex;width:42px;height:42px;align-items:center;justify-content:center;background:#fafaf9;border:1px solid var(--divider);border-radius:4px;font-size:20px;">⏻</span><span>Wall button (Square D X-Series)</span></div>
 </div>
 
 <div style="background:#fff;border:1px solid var(--divider);border-radius:8px;padding:16px;margin:12px 0;overflow-x:auto;">
@@ -3028,7 +3065,7 @@
 
   <!-- Wall button → GPIO18 -->
   <rect class="dest dest-aux" x="560" y="308" width="320" height="24" rx="5"/>
-  <text class="dest-lbl" x="572" y="325">Wall button (reuse) · NO terminal</text>
+  <text class="dest-lbl" x="572" y="325">Wall button (Square D X-Series) · momentary NO</text>
   <text class="dest-sub" x="752" y="325" text-anchor="end">other side → GND</text>
   <path class="wc-wht" d="M 520 320 L 560 320"/>
 
@@ -3104,7 +3141,7 @@
     <tr><td><code>GPIO23</code></td><td>input (pull-up)</td><td>ENDSTOP A SIG (slide A side) — same wiring + same 3.3 V constraint as GPIO22.</td><td>white</td></tr>
     <tr><td><code>GPIO16</code></td><td>output</td><td>BC547 base (via 1 kΩ) → switches BC547 collector LOW, sinking F-1001 coil current to GND. F-1001 coil's + side is fed by SCREEN plug pin 1 from the 5 V rail. 1N4148 flyback diode lives off-board across the coil terminals.</td><td>white</td></tr>
     <tr><td><code>GPIO17</code></td><td>output (PWM)</td><td>Out main board via FAN SIG plug pin 2 → fan-driver SIG IN pin 2 → 220 Ω → IRLZ44N MOSFET gate — low-side PWM control of both AIRPLATE fans on 6.5 V rail</td><td>green</td></tr>
-    <tr><td><code>GPIO18</code></td><td>input (pull-up)</td><td>Wall button — switch-to-GND, internal pull-up enabled in ESPHome</td><td>white</td></tr>
+    <tr><td><code>GPIO18</code></td><td>input (pull-up)</td><td>Wall button (Square D X-Series momentary rocker) — switch-to-GND, internal pull-up enabled in ESPHome. Each press fires <code>on_press</code> once; release is ignored.</td><td>white</td></tr>
   </tbody>
 </table>
 
@@ -3940,7 +3977,7 @@
   <div style="background:#fff;border:1px solid var(--divider);border-radius:8px;padding:14px;">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
       <span style="display:inline-block;padding:2px 8px;background:#dbeafe;color:#1d4ed8;border-radius:4px;font-size:11px;font-weight:700;letter-spacing:0.04em;">PLUG 2</span>
-      <strong style="font-size:15px;">BUTTON — wall button</strong>
+      <strong style="font-size:15px;">BUTTON — wall button (Square D X-Series momentary)</strong>
     </div>
     <svg viewBox="0 0 200 60" style="display:block;width:160px;height:48px;margin:6px 0;">
       <rect x="2" y="6" width="196" height="46" rx="5" fill="#fef3c7" stroke="#b45309" stroke-width="1.5"/>
@@ -3952,8 +3989,8 @@
       <text x="150" y="54" text-anchor="middle" font-size="10" fill="#52525b" font-weight="600">PIN 2</text>
     </svg>
     <table style="font-size:13px;margin-top:6px;">
-      <tr><td style="width:50px;"><span style="display:inline-block;width:30px;height:6px;background:#18181b;border-radius:1px;vertical-align:middle;"></span></td><td><strong>Pin 1 · black</strong> · GND — one side of the momentary switch → logic GND rail</td></tr>
-      <tr><td><span style="display:inline-block;width:30px;height:6px;background:#9ca3af;border-radius:1px;border:1px solid #6b7280;vertical-align:middle;"></span></td><td><strong>Pin 2 · white</strong> · sense — other side of switch (NO terminal) → ESP32 <code>GPIO 18</code> (internal pull-up enabled)</td></tr>
+      <tr><td style="width:50px;"><span style="display:inline-block;width:30px;height:6px;background:#18181b;border-radius:1px;vertical-align:middle;"></span></td><td><strong>Pin 1 · black</strong> · GND — one side of the momentary switch → logic GND rail (one conductor of the existing 2-wire in-wall run)</td></tr>
+      <tr><td><span style="display:inline-block;width:30px;height:6px;background:#9ca3af;border-radius:1px;border:1px solid #6b7280;vertical-align:middle;"></span></td><td><strong>Pin 2 · white</strong> · sense — other side of switch (Square D SPST momentary terminal) → ESP32 <code>GPIO 18</code> (internal pull-up enabled). Each press momentarily ties Pin 2 to Pin 1, dropping GPIO 18 LOW; release spring-returns and the pull-up restores HIGH.</td></tr>
     </table>
   </div>
 
@@ -4825,7 +4862,7 @@
 
 <h3 style="margin-top:24px">2× BTS7960 H-bridges (one per actuator)</h3>
 <p style="margin-top:0;font-size:14px;color:var(--muted)">
-  Each PA-04 gets its own IBT-2 module — independent current sensing per actuator means per-motor stall detection (figure out <em>which</em> side jammed, not just that something stalled). Both modules share the same control signals so they move in lockstep; the only thing per-module is the M+/M- output and the analog current-sense readings.
+  Each PA-04 gets its own IBT-2 module — independent current sensing per actuator means each side can be cut independently when its endstop trips, and the firmware can confirm retract-end on each motor separately by watching its IS pin collapse to ~0 V. Both modules share the same control signals so they move in lockstep; the only thing per-module is the M+/M- output and the analog current-sense readings.
 </p>
 <ul>
   <li><strong>B+ / B−</strong> (both modules) → each module's pair pulls from its dedicated BTS OUT plug on the <strong>motor fuse board</strong> (Diagram #6) — BTS #1's B+/B− from that board's BTS #1 OUT plug, BTS #2's from BTS #2 OUT. Each plug carries one 5 A fast-blow fuse in series with B+; the 1000 µF bulk cap and the P6KE15CA TVS live on the motor fuse board adjacent to the rail, so they're electrically close to both BTS modules.</li>
@@ -4833,7 +4870,7 @@
   <li><strong>VCC / GND</strong> (both modules) → 5 V rail (LM2596 #1 OUT+) + GND rail. BTS7960 logic is rated for 5 V, and the same rail powers the ESP32's 5V/VIN pin, so it's a single supply net.</li>
   <li><strong>RPWM / LPWM</strong> (both modules) → tied together → two ESP32 PWM pins total (extend / retract). Use LEDC at 20–25 kHz to stay inaudible. Both modules see the same PWM, so they move in sync.</li>
   <li><strong>R_EN / L_EN</strong> (both modules) → <strong>split per-BTS, not ganged</strong>: BTS #1's R_EN + L_EN tie together and go to <strong>GPIO 27</strong>; BTS #2's R_EN + L_EN tie together and go to <strong>GPIO 19</strong>. Firmware drops one EN LOW on its actuator's endstop trip → that BTS goes hi-Z, only that actuator stops while the other keeps moving. Confirmed against §9 Diagram #1 GPIO map and the main board wire-list table.</li>
-  <li><strong>R_IS / L_IS</strong> → <strong>4 ESP32 analog inputs total</strong> (2 per module). Per-actuator current readings; firmware detects end-of-travel (current drops to ~0 when internal limits trigger) and per-side stall/jam (current spikes above running level on one specific module).</li>
+  <li><strong>R_IS / L_IS</strong> → <strong>4 ESP32 analog inputs total</strong> (2 per module). Per-actuator current readings; firmware uses R_IS during CLOSING to detect retract end-of-travel (current drops to ~0 when each PA-04's internal limit opens its motor circuit). The high end of the IS range saturates the ADC at the on-module 10 kΩ pulldown — irrelevant here, since "current dropped to zero" is a low-end transition that the ADC reads cleanly.</li>
 </ul>
 
 <h3 style="margin-top:20px">PA-04 actuators (no external endstops)</h3>
@@ -4868,7 +4905,7 @@
 
 <h3 style="margin-top:20px">Wall button + projector IR repeater</h3>
 <ul>
-  <li><strong>Wall button</strong>: one side to ESP32 GPIO with internal pull-up enabled, other side to logic GND (switch-to-ground pattern). ESPHome's <code>binary_sensor</code> handles debouncing in software via <code>delayed_on</code>/<code>delayed_off</code> filters — no hardware RC needed.</li>
+  <li><strong>Wall button</strong>: Square D X-Series SQR14106WH momentary rocker. One terminal to ESP32 GPIO 18 with internal pull-up enabled, other to logic GND (switch-to-ground pattern). Each press momentarily pulls GPIO 18 LOW; release floats it back HIGH via the pull-up. ESPHome's <code>binary_sensor</code> handles debouncing in software via <code>delayed_on</code>/<code>delayed_off</code> filters — no hardware RC needed. Firmware dispatches on the rising edge (<code>on_press</code>): both deployed-end endstops tripped ⇒ CLOSE, otherwise ⇒ OPEN. Release is not bound.</li>
   <li><strong>IR repeater</strong>: stays as-is, untouched. Projector power is independent of the lift control.</li>
 </ul>
 
@@ -4939,18 +4976,18 @@
     </tr>
     <tr>
       <td><strong>OPENING</strong></td>
-      <td>Button press from CLOSED</td>
-      <td>Start fans (GPIO 17 fan PWM ramp to viewing-mode duty). Ramp LPWM (extend) from 0 → cruise over ~500 ms. Drop screen (F-1001 ch1 closed via GPIO 16 → BC547). Watch R_IS/L_IS — when current drops to ~10% of running ⇒ internal limits hit ⇒ enter OPEN. If either endstop trips, drop EN on that BTS only. If both endstops haven't tripped by ~13 s ⇒ fault. If current spikes ≥2× running ⇒ stall ⇒ reverse for 1–2 sec, enter CLOSED.</td>
+      <td>Button press (endstops not yet tripped)</td>
+      <td>Start fans (GPIO 17 fan PWM ramp to viewing-mode duty). Ramp LPWM (extend) from 0 → cruise over ~500 ms. Drop screen (F-1001 ch1 closed via GPIO 16 → BC547). Wait for both deployed-end endstops to trip — each endstop trip drops EN on its own BTS while the other side keeps moving. Both tripped ⇒ enter OPEN. If both endstops haven't tripped by the travel-safety timeout (~15 s) ⇒ FAULT.</td>
     </tr>
     <tr>
       <td><strong>OPEN</strong></td>
-      <td>OPENING completed (limits hit)</td>
+      <td>Both endstops tripped</td>
       <td>PWM = 0. Fans stay on. Wait for button.</td>
     </tr>
     <tr>
       <td><strong>CLOSING</strong></td>
-      <td>Button press from OPEN</td>
-      <td>Ramp RPWM (retract) from 0 → cruise. Watch current. Limits hit ⇒ enter COOLDOWN. Stall during retract ⇒ cut PWM, log, manual recovery (don't auto-reverse on retract — different safety profile).</td>
+      <td>Button press (endstops tripped)</td>
+      <td>Ramp RPWM (retract) from 0 → cruise. Wait for both R_IS readings to fall below the EOT threshold (each PA-04 internal limit opens its motor circuit, the IS-pin voltage collapses to ~0 V). Both below threshold ⇒ enter COOLDOWN. Travel-safety timeout ⇒ FAULT. A button press mid-CLOSING reverses to OPENING.</td>
     </tr>
     <tr>
       <td><strong>COOLDOWN</strong></td>
@@ -4967,7 +5004,7 @@
   <li><strong>Soft-start / soft-stop ramps</strong>: ~500 ms accel and decel at each end of travel. Quieter motion, less mechanical shock.</li>
   <li><strong>Hardware watchdog</strong>: <code>esp_task_wdt</code> with 5 s timeout, fed from the main loop. Any firmware hang self-resets the MCU in seconds.</li>
   <li><strong>Power-outage behavior</strong>: on boot, default to CLOSED state with fans OFF. If the box was actually mid-cycle when power was lost, it's stuck in whatever position the actuators stopped at — user can press the button to recover (button press from CLOSED state ⇒ OPENING, which will run until limits hit and re-establish state). Fail-safe rather than fail-active.</li>
-  <li><strong>Reverse-on-stall during descent only</strong>: stall during box-dropping = possible obstruction below ⇒ auto-reverse. Stall during box-retracting = something jammed mechanically ⇒ stop and require manual attention (don't keep pushing/pulling in an uncertain situation).</li>
+  <li><strong>Single-button dispatch driven by endstop state</strong>: a wall-button press checks the two deployed-end endstops — both tripped ⇒ CLOSE, otherwise ⇒ OPEN. This makes the wall switch a pure event source rather than a state mirror, so it never fights the remote, voice control, or HA-side commands. A press mid-CLOSING reverses cleanly to OPENING (open_lift stops close_lift first); a press during COOLDOWN cancels the timer and reopens; a press during FAULT is ignored.</li>
 </ul>
 
 <h3 style="margin-top:20px">Configuration that should be tunable</h3>
@@ -4977,7 +5014,7 @@
 </p>
 <ul>
   <li><strong>Cooldown duration</strong> (default 30 min) — adjust if 30 min feels too long or too short in practice</li>
-  <li><strong>Current-sense thresholds</strong> (running / end-of-travel / stall) — calibrate empirically with the real PA-04s on the bench</li>
+  <li><strong>End-of-travel threshold</strong> (R_IS voltage below which retract is considered complete) — calibrate empirically with the real PA-04s on the bench</li>
   <li><strong>PWM ramp duration</strong> (default 500 ms) — slower = quieter, faster = snappier</li>
   <li><strong>Screen drop / retract delay</strong> relative to box motion (default ~3 sec post-close before retracting screen) — depends on how long the box takes to fully clear the screen path</li>
   <li><strong>Cruise PWM duty cycle</strong> (default 100%) — could be reduced for quieter travel at the cost of speed</li>
@@ -5419,7 +5456,7 @@ Z2ON        # Zone 2 also continues (porch + house both play)</pre>
     </tr>
     <tr>
       <td>Power outage mid-cycle</td>
-      <td>ESP32 reads wall-button maintained state on boot, reconciles AVR + projector + actuators to match. Maintained-toggle physical state is the source of truth.</td>
+      <td>ESP32 boots to CLOSED (fail-safe default — fans off, ENs LOW, PWM 0). If the box happens to be physically partway down, the next wall-button press reads endstops as "not deployed" ⇒ fires OPEN, which runs until both endstops trip and re-establishes a known position. If the box was already at the deployed endstops when power dropped, the press reads "deployed" ⇒ fires CLOSE. Either way the next press is the recovery.</td>
     </tr>
     <tr>
       <td>Network down (AVR Telnet unreachable)</td>
@@ -5672,9 +5709,9 @@ Wall button state model stays in sync
       <li><strong>Motor fuse board</strong> (5×7 cm, Diagram #6) — 2× 5 A fuse holders + 1000 µF bulk cap + P6KE15CA TVS + 3 plugs (PSU IN · BTS #1 OUT · BTS #2 OUT). Per-actuator fusing with bulk-cap inrush smoothing + TVS clamp sitting close to the BTS B+ pads.</li>
     </ul>
     Both LM2596 bucks are standalone modules — neither lives on a perfboard. Dial each to its target output voltage (5.0 V for #1 to main, 6.5 V for #2 to fan-driver) <em>before</em> wiring into the system; an unconfigured LM2596 can ship at anywhere from 1.25 V to nearly Vin. After soldering each board, leave the fuse cartridges out of their holders during multimeter continuity testing — it isolates the input for safe probing.</li>
-  <li><strong>Write ESPHome firmware</strong> — motor <code>cover</code> entities (one per actuator) with current-sense end-of-travel detection + per-actuator EN drop on endstop trip + ~13 s watchdog + reverse-on-stall, <code>binary_sensor</code> for wall button (switch-to-GND, internal pull-up, software debounce), <code>binary_sensor</code> per endstop (GPIO 22 + 23, INPUT_PULLUP), <code>output</code> (LEDC PWM) on GPIO 17 for fan-driver MOSFET gate with mode-based duty + 30-min cooldown automation, <code>output</code> on GPIO 16 for BC547 → F-1001 screen trigger.</li>
-  <li><strong>Bench test outside the ceiling</strong> — wire up the full control board with both PA-04s on the bench. Calibrate current-sense thresholds (running / end-of-travel / stall) empirically. Verify: dual-actuator sync, per-side stall detection, soft-start ramp duration, button debounce, screen trigger timing, fan cooldown timer, power-outage fail-safe boot to CLOSED. Tune ESPHome filters as needed.</li>
-  <li><strong>Install day</strong> — pull old electronics, mount new box to ceiling, mount projector to bottom panel, mount actuators with BRK-01 brackets, mount endstops one per drawer slide (lever ~¼" before the slide's hard stop), run wires to wall button + F-1001 coil pair (via SCREEN plug) + fan-driver SIG IN (via FAN SIG plug) + both endstops (via 3-pin headers), land all wires into Phoenix terminal plugs / endstop headers, snap plugs into perfboard sockets, full extend/retract test cycle, verify each endstop trips at the correct point and both actuators reach their endpoints.</li>
+  <li><strong>Write ESPHome firmware</strong> — single <code>cover</code> entity with R_IS current-drop EOT detection on CLOSING + per-actuator EN drop on endstop trip during OPENING + ~15 s travel-safety timeout in both directions, <code>binary_sensor</code> for the momentary wall button (single <code>on_press</code> dispatcher: deployed-endstops tripped ⇒ CLOSE, else OPEN; release ignored), <code>binary_sensor</code> per endstop (GPIO 22 + 23, INPUT_PULLUP), <code>output</code> (LEDC PWM) on GPIO 17 for fan-driver MOSFET gate with mode-based duty + 30-min cooldown automation, <code>output</code> on GPIO 16 for BC547 → F-1001 screen trigger.</li>
+  <li><strong>Bench test outside the ceiling</strong> — wire up the full control board with both PA-04s on the bench. Calibrate the End-of-travel threshold empirically (jog retract repeatedly, watch R_IS drop to ~0 V when the PA-04 internal limit hits). Verify: dual-actuator sync, per-side endstop cutoff during extend, soft-start ramp duration, button debounce, single-press dispatch logic against endstop state, screen trigger timing, fan cooldown timer, power-outage fail-safe boot to CLOSED. Tune ESPHome filters as needed.</li>
+  <li><strong>Install day</strong> — pull old electronics, mount new box to ceiling, mount projector to bottom panel, mount actuators with BRK-01 brackets, mount one Prusa endstop on each main-box interior wall at the chosen deployed (lowest-travel) height, mount the trip-bracket on the top of the inner box, swap the existing maintained-toggle wall switch out for the Square D X-Series momentary in the gang box, run wires to the F-1001 coil pair (via SCREEN plug) + fan-driver SIG IN (via FAN SIG plug) + both endstops (via 3-pin headers), reuse the existing 2-wire run from the gang box to the BUTTON plug, land all wires into Phoenix terminal plugs / endstop headers, snap plugs into perfboard sockets, full extend/retract test cycle, verify each endstop trips at the correct point and both actuators reach their endpoints.</li>
   <li><strong>Home Assistant integration</strong> — once ESPHome is talking, expose the box (open/closed/moving) + button + fan state to HA for any future automation (e.g., "if Plex starts playing, open the box").</li>
   <li><strong>Order AV chain parts</strong> — Denon AVR-X2800H Refurb ($999.50, Amazon B0C5S64TVN) + Apple TV 4K Gen 3 128 GB ($149). <strong>All cabling reused</strong>: 50 ft Denon→projector HDMI + short Sony→Denon HDMI (re-terminated to the new AVR's two outputs) + Cat5e pulled from Zach's on-hand stock for the projector PJLink run. <strong>HA Green for Alexa (Section 13) is ordered via the parents' smart home doc</strong>, not this BOM.</li>
   <li><strong>Set up HA Green + Alexa integration (Section 13)</strong> — once Dad orders HA Green from the smart home doc: plug into parents' router, run onboarding wizard, enable Nabu Casa Cloud subscription ($65/yr), expose the projector ESP32 cover entity to Alexa, verify "Alexa, turn on the projector" fires the OPEN sequence end-to-end.</li>

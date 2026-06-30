@@ -19,7 +19,7 @@ reference: [`../index.html`](../index.html) (rendered at
 | 35    | ADC1_7         | BTS7960 #2 L_IS — actuator B extend  (open)  current       |
 | 17    | OUT (PWM)      | IRLZ44N gate via 220 Ω — fan PWM (6.5 V rail)             |
 | 16    | OUT            | 1 kΩ → BC547 base → F-1001 coil (screen relay)             |
-| 18    | IN, pull-up    | Momentary Decora wall switch, switch-to-GND                |
+| 18    | IN, pull-up    | Momentary wall switch (Square D X-Series), switch-to-GND   |
 | 23    | IN, pull-up    | Endstop A SIG (deployed end, Prusa MK3 NO-to-GND)          |
 | 22    | IN, pull-up    | Endstop B SIG (deployed end, Prusa MK3 NO-to-GND)          |
 

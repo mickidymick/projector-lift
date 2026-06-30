@@ -14,26 +14,33 @@
 #   GPIO35  ← BTS7960 #2 L_IS (ADC1_7) actuator B extend  (open)  current
 #   GPIO17  → IRLZ44N gate via 220 Ω (low-side fan PWM, 6.5 V rail)
 #   GPIO16  → 1 kΩ → BC547 base → F-1001 coil (screen drop)
-#   GPIO18  ← wall button (Leviton 5655-2 momentary Decora, switch-to-GND, INPUT_PULLUP)
+#   GPIO18  ← wall button (Square D X-Series SQR14106WH momentary, switch-to-GND, INPUT_PULLUP)
 #   GPIO23  ← Prusa endstop A SIG (deployed-end, NO-to-GND, INPUT_PULLUP)
 #   GPIO22  ← Prusa endstop B SIG (deployed-end, NO-to-GND, INPUT_PULLUP)
 #
-# CONTROL MODEL — single momentary button, endstop-driven dispatch:
-#   both endstops tripped   ⇒ button press triggers CLOSE (retract)
-#   either endstop not yet  ⇒ button press triggers OPEN  (extend)
-# Pressing mid-motion is fine — open_lift is mode:restart and stops close_lift
-# first, so a press during CLOSING reverses cleanly to OPENING. Pressing during
-# COOLDOWN cancels the timer and reopens. FAULT requires manual Diag reset.
+# CONTROL MODEL — single momentary button, state-machine-driven dispatch:
+#   state=CLOSED        ⇒ press triggers OPEN  (with endstop confirmation logged)
+#   state=OPENING/OPEN  ⇒ press triggers CLOSE
+#   state=CLOSING       ⇒ press REVERSES to OPEN (open_lift stops close_lift first)
+#   state=COOLDOWN      ⇒ press cancels the cooldown timer and reopens
+#   state=FAULT         ⇒ press is ignored (manual Diag reset required)
 #
-# Endstops are the primary end-of-travel signal for OPENING. Each endstop is
-# mounted on the main box wall at the user-chosen deployed position; a bracket
-# on the top of the inner box trips them as the box descends. When endstop A
-# trips, GPIO27 drops LOW so BTS #1 goes hi-Z and actuator A stops; actuator B
-# keeps moving until endstop B fires. Current-sense provides the EOT signal
-# for CLOSING (no endstop at the retract end — PA-04 internal limit opens the
-# motor circuit and the IS-pin voltage collapses to ~0). The high end of the
-# IS range saturates the ADC at the on-module 10 kΩ pulldown, but the low end
-# is fully readable, so "current dropped to zero" is a clean binary signal.
+# Endstops are pure state-confirmation sensors — they do NOT cut motors.
+# New rails travel 12" vs the actuators' 8" stroke, so the PA-04 internal
+# limit switches are the mechanical safety at both ends of travel; the
+# external endstops are no longer needed for slide-overrun protection.
+# Each endstop is mounted directly on its actuator and trips when the
+# actuator is at its fully-retracted endpoint. With BOTH tripped we know
+# with certainty that the box is fully CLOSED. Otherwise we treat it as
+# OPEN / in motion.
+#
+# End-of-travel signal for BOTH directions is the IS-pin current drop:
+# when the PA-04 internal limit opens the motor circuit, the IS-pin voltage
+# falls to ~0. OPENING reads L_IS (extend current); CLOSING reads R_IS
+# (retract current). The high end of the IS range saturates the ADC at the
+# on-module 10 kΩ pulldown but the low end is fully readable, so
+# "current dropped to zero" is a clean binary signal. The travel-safety
+# timeout is the fallback failsafe in both directions.
 #
 # Network reach (§12): on lift state change the firmware sends Telnet mode
 # commands to the Denon AVR (port 23) and PJLink power commands to the Epson
@@ -87,6 +94,15 @@ api:
 ota:
   - platform: esphome
     password: !secret ota_password
+
+# Browser UI at http://projector-lift.local/ — live sensor readouts + the
+# Diag buttons + manual reset. No auth (LAN-only assumption); flip to
+# `auth:` + credentials if exposing beyond the trusted network.
+web_server:
+  port: 80
+  version: 3
+  ota: false
+  log: false
 
 # ===========================================================================
 # Tunables — HA Number entities so calibration doesn't need a re-flash.
@@ -155,7 +171,7 @@ number:
     min_value: 0.00
     max_value: 1.50
     step: 0.01
-    initial_value: 0.10
+    initial_value: 0.30
     restore_value: true
     optimistic: true
     unit_of_measurement: V
@@ -181,6 +197,18 @@ number:
     restore_value: true
     optimistic: true
     unit_of_measurement: s
+
+  - platform: template
+    name: "Jog duty"
+    id: jog_pct
+    min_value: 30
+    max_value: 100
+    step: 5
+    initial_value: 40
+    restore_value: true
+    optimistic: true
+    unit_of_measurement: "%"
+    mode: slider
 
 globals:
   # 0=CLOSED 1=OPENING 2=OPEN 3=CLOSING 4=COOLDOWN 5=FAULT
@@ -285,6 +313,108 @@ switch:
       - lambda: |-
           if (id(lift_state) == 2) id(close_lift).execute();
 
+  # ----- Per-actuator leveling jogs ---------------------------------------
+  # Click ON to start moving, click OFF to stop. NO software timeout.
+  # Mutex: turning any one ON turns the others OFF (shared PWM lines mean
+  # opposing directions ON simultaneously = BTS shoot-through).
+  # Endstops interrupt the matching extend jog only (endstop A → jog_a_up,
+  # endstop B → jog_b_up). Retract jogs are not interrupted (PA-04 internal
+  # limit catches end-of-travel mechanically).
+
+  - platform: template
+    name: "Level: 1 up (extend)"
+    id: jog_a_up
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+    turn_on_action:
+      # Mutex via publish_state — does NOT trigger the other switches'
+      # turn_off_action (which would race and cut our bts/PWM mid-motion).
+      - lambda: |-
+          id(jog_a_down).publish_state(false);
+          id(jog_b_up).publish_state(false);
+          id(jog_b_down).publish_state(false);
+      - light.turn_off: { id: rpwm, transition_length: 0s }
+      - switch.turn_off: bts_b_enable
+      - delay: 50ms
+      - switch.turn_on: bts_a_enable
+      - light.turn_on:
+          id: lpwm
+          brightness: !lambda return id(jog_pct).state / 100.0;
+          transition_length: 100ms
+    turn_off_action:
+      - light.turn_off: { id: lpwm, transition_length: 100ms }
+      - delay: 150ms
+      - switch.turn_off: bts_a_enable
+
+  - platform: template
+    name: "Level: 1 down (retract)"
+    id: jog_a_down
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+    turn_on_action:
+      - lambda: |-
+          id(jog_a_up).publish_state(false);
+          id(jog_b_up).publish_state(false);
+          id(jog_b_down).publish_state(false);
+      - light.turn_off: { id: lpwm, transition_length: 0s }
+      - switch.turn_off: bts_b_enable
+      - delay: 50ms
+      - switch.turn_on: bts_a_enable
+      - light.turn_on:
+          id: rpwm
+          brightness: !lambda return id(jog_pct).state / 100.0;
+          transition_length: 100ms
+    turn_off_action:
+      - light.turn_off: { id: rpwm, transition_length: 100ms }
+      - delay: 150ms
+      - switch.turn_off: bts_a_enable
+
+  - platform: template
+    name: "Level: 2 up (extend)"
+    id: jog_b_up
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+    turn_on_action:
+      - lambda: |-
+          id(jog_a_up).publish_state(false);
+          id(jog_a_down).publish_state(false);
+          id(jog_b_down).publish_state(false);
+      - light.turn_off: { id: rpwm, transition_length: 0s }
+      - switch.turn_off: bts_a_enable
+      - delay: 50ms
+      - switch.turn_on: bts_b_enable
+      - light.turn_on:
+          id: lpwm
+          brightness: !lambda return id(jog_pct).state / 100.0;
+          transition_length: 100ms
+    turn_off_action:
+      - light.turn_off: { id: lpwm, transition_length: 100ms }
+      - delay: 150ms
+      - switch.turn_off: bts_b_enable
+
+  - platform: template
+    name: "Level: 2 down (retract)"
+    id: jog_b_down
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+    turn_on_action:
+      - lambda: |-
+          id(jog_a_up).publish_state(false);
+          id(jog_a_down).publish_state(false);
+          id(jog_b_up).publish_state(false);
+      - light.turn_off: { id: lpwm, transition_length: 0s }
+      - switch.turn_off: bts_a_enable
+      - delay: 50ms
+      - switch.turn_on: bts_b_enable
+      - light.turn_on:
+          id: rpwm
+          brightness: !lambda return id(jog_pct).state / 100.0;
+          transition_length: 100ms
+    turn_off_action:
+      - light.turn_off: { id: rpwm, transition_length: 100ms }
+      - delay: 150ms
+      - switch.turn_off: bts_b_enable
+
 # ===========================================================================
 # Inputs — wall button + two endstops. All three are NO switch-to-GND with
 # INPUT_PULLUP enabled; `inverted: true` so "active" reads as "pressed/tripped".
@@ -300,50 +430,42 @@ binary_sensor:
     filters:
       - delayed_on: 30ms
       - delayed_off: 30ms
-    # Momentary Decora switch (Leviton 5655-2 or equivalent): each press fires
-    # once; release is ignored. Dispatch is endstop-driven, not state-driven —
-    # both deployed-end endstops tripped ⇒ CLOSE, otherwise ⇒ OPEN. A press
-    # mid-CLOSING reverses to OPENING (open_lift stops close_lift first); a
-    # press mid-OPENING re-executes open_lift (mode:restart, harmless). FAULT
-    # requires manual recovery via "Diag: reset to CLOSED".
+    # Momentary rocker (Square D X-Series SQR14106WH): each press fires once;
+    # release is ignored. Dispatch is endstop-driven, not state-driven —
+    # EITHER deployed-end endstop tripped ⇒ CLOSE, NEITHER tripped ⇒ OPEN.
+    # The asymmetric case (one tripped, one not) routes to CLOSE because OPEN
+    # relies on endstop on_press edges to cut each BTS — an already-tripped
+    # endstop can't re-fire on_press, so its actuator would run unstopped.
+    # CLOSE has no such edge dependency: both actuators retract until each
+    # PA-04's internal limit opens its motor circuit and R_IS collapses.
+    # A press mid-CLOSING reverses to OPENING (open_lift stops close_lift
+    # first); a press mid-OPENING re-executes open_lift (mode:restart,
+    # harmless). FAULT requires manual recovery via "Diag: reset to CLOSED".
     on_press:
-      then:
-        - lambda: |-
-            int s = id(lift_state);
-            bool deployed = id(endstop_a).state && id(endstop_b).state;
-            ESP_LOGI("lift", "button press (state=%d deployed=%d)", s, deployed);
-            if (s == 5) {
-              ESP_LOGW("lift", "in FAULT — ignoring button; run Diag: reset");
-              return;
-            }
-            if (deployed) {
-              id(close_lift).execute();
-            } else {
-              if (s == 4) {
-                ESP_LOGI("lift", "canceling cooldown");
-                id(cooldown_timer).stop();
-              }
-              id(open_lift).execute();
-            }
+      - script.execute: wall_press
 
+  # Endstops are pure state-confirmation sensors under the new design — they
+  # do NOT cut motors. Motors run to the PA-04 internal limit and stop when
+  # the IS-pin current drops. on_press / on_release here is informational
+  # only (logging + the state-derivation text sensor reads .state directly).
   - platform: gpio
     pin:
       number: GPIO23
       mode: INPUT_PULLUP
       inverted: true
     id: endstop_a
-    name: "Endstop A"
+    name: "Endstop 1"
     filters:
       - delayed_on: 10ms
       - delayed_off: 10ms
     on_press:
       then:
         - lambda: |-
-            ESP_LOGI("lift", "endstop A tripped (state=%d)", id(lift_state));
-            if (id(lift_state) == 1) {
-              // Drop BTS #1 → actuator A coasts to stop while B keeps moving.
-              id(bts_a_enable).turn_off();
-            }
+            ESP_LOGI("lift", "endstop A tripped — actuator 1 at retracted endpoint (state=%d)", id(lift_state));
+    on_release:
+      then:
+        - lambda: |-
+            ESP_LOGI("lift", "endstop A released — actuator 1 left retracted endpoint (state=%d)", id(lift_state));
 
   - platform: gpio
     pin:
@@ -351,23 +473,24 @@ binary_sensor:
       mode: INPUT_PULLUP
       inverted: true
     id: endstop_b
-    name: "Endstop B"
+    name: "Endstop 2"
     filters:
       - delayed_on: 10ms
       - delayed_off: 10ms
     on_press:
       then:
         - lambda: |-
-            ESP_LOGI("lift", "endstop B tripped (state=%d)", id(lift_state));
-            if (id(lift_state) == 1) {
-              id(bts_b_enable).turn_off();
-            }
+            ESP_LOGI("lift", "endstop B tripped — actuator 2 at retracted endpoint (state=%d)", id(lift_state));
+    on_release:
+      then:
+        - lambda: |-
+            ESP_LOGI("lift", "endstop B released — actuator 2 left retracted endpoint (state=%d)", id(lift_state));
 
 sensor:
   - platform: adc
     pin: GPIO32
     id: a_ris
-    name: "Actuator A R_IS"
+    name: "Actuator 1 R_IS"
     update_interval: 50ms
     attenuation: 12db
     accuracy_decimals: 3
@@ -377,7 +500,7 @@ sensor:
   - platform: adc
     pin: GPIO33
     id: a_lis
-    name: "Actuator A L_IS"
+    name: "Actuator 1 L_IS"
     update_interval: 50ms
     attenuation: 12db
     accuracy_decimals: 3
@@ -387,7 +510,7 @@ sensor:
   - platform: adc
     pin: GPIO34
     id: b_ris
-    name: "Actuator B R_IS"
+    name: "Actuator 2 R_IS"
     update_interval: 50ms
     attenuation: 12db
     accuracy_decimals: 3
@@ -397,7 +520,7 @@ sensor:
   - platform: adc
     pin: GPIO35
     id: b_lis
-    name: "Actuator B L_IS"
+    name: "Actuator 2 L_IS"
     update_interval: 50ms
     attenuation: 12db
     accuracy_decimals: 3
@@ -411,15 +534,16 @@ text_sensor:
     id: lift_state_str
     update_interval: 1s
     lambda: |-
-      switch (id(lift_state)) {
-        case 0: return {"CLOSED"};
-        case 1: return {"OPENING"};
-        case 2: return {"OPEN"};
-        case 3: return {"CLOSING"};
-        case 4: return {"COOLDOWN"};
-        case 5: return {"FAULT"};
-        default: return {"UNKNOWN"};
+      // Derived from physical endstops, NOT the internal state machine —
+      // so it reflects current physical reality across reboots / faults.
+      // Endstops are mounted on the actuators and trip when those actuators
+      // are at their fully-retracted endpoint. BOTH tripped = box certainly
+      // CLOSED. Anything else (one tripped, neither tripped) = the box is
+      // either OPEN, in motion, or in an asymmetric state — call it OPEN.
+      if (id(endstop_a).state && id(endstop_b).state) {
+        return {"CLOSED"};
       }
+      return {"OPEN"};
 
   - platform: template
     name: "AVR monitor mode"
@@ -492,18 +616,63 @@ script:
 
   - id: emergency_stop
     then:
-      # Halt any in-flight motion script first — otherwise its delays /
-      # wait_until would resume and contend with our shutdown.
+      # Halt every in-flight motion script first — otherwise their delays /
+      # wait_until would resume after this script finishes and re-energize
+      # the motors. Order matters: stop scripts, THEN kill PWM, THEN BTSes.
       - script.stop: open_lift
       - script.stop: close_lift
-      - light.turn_off: { id: rpwm, transition_length: 100ms }
-      - light.turn_off: { id: lpwm, transition_length: 100ms }
+      - script.stop: test_endstop_a_cycle
+      - script.stop: test_endstop_b_cycle
+      # 0 s transition = instant kill (no fade). Faster than 100 ms is also
+      # safer if a wedged scheduler is the reason we're here.
+      - light.turn_off: { id: rpwm, transition_length: 0s }
+      - light.turn_off: { id: lpwm, transition_length: 0s }
       - switch.turn_off: bts_a_enable
       - switch.turn_off: bts_b_enable
+      # Release the screen too — we don't know what position the box is in
+      # so leaving the screen deployed indefinitely is the wrong default.
+      - switch.turn_off: screen_relay
       - lambda: id(lift_state) = 5;
       - logger.log:
           format: "EMERGENCY STOP (state=FAULT) — run 'Diag: reset to CLOSED' to recover"
           level: WARN
+
+  # ---- Shared button-press dispatcher -----------------------------------
+  # Same logic as the wall-button on_press; called by both the wall button
+  # and the "Wall button (virtual)" UI button. Endstops are state-confirm
+  # sensors only, so dispatch is primarily state-machine-driven:
+  #   FAULT          → ignore + warn
+  #   CLOSED         → OPEN (log endstop confirmation)
+  #   OPENING / OPEN → CLOSE
+  #   CLOSING        → OPEN (reverses; open_lift is mode:restart)
+  #   COOLDOWN       → cancel timer + OPEN
+  - id: wall_press
+    then:
+      - lambda: |-
+          int s = id(lift_state);
+          bool both_retracted = id(endstop_a).state && id(endstop_b).state;
+          ESP_LOGI("lift", "button press (state=%d both_retracted=%d)", s, both_retracted);
+          if (s == 5) {
+            ESP_LOGW("lift", "in FAULT — ignoring button; run Diag: reset");
+            return;
+          }
+          if (s == 1 || s == 2) {
+            // OPENING or OPEN → user wants to close.
+            id(close_lift).execute();
+          } else if (s == 3) {
+            // CLOSING → reverse to OPEN.
+            id(open_lift).execute();
+          } else if (s == 4) {
+            ESP_LOGI("lift", "canceling cooldown");
+            id(cooldown_timer).stop();
+            id(open_lift).execute();
+          } else /* s == 0, CLOSED */ {
+            if (!both_retracted) {
+              ESP_LOGW("lift", "state=CLOSED but endstops disagree (a=%d b=%d) — opening anyway",
+                       id(endstop_a).state, id(endstop_b).state);
+            }
+            id(open_lift).execute();
+          }
 
   # ---- OPEN sequence -----------------------------------------------------
   # Order matters: PJLink first (projector warm-up takes ~30 s in parallel),
@@ -539,9 +708,14 @@ script:
       - wait_until:
           condition:
             lambda: |-
-              // EOT for OPENING is purely endstop-driven; travel_timeout below
-              // is the failsafe if a switch or wire goes bad.
-              return id(endstop_a).state && id(endstop_b).state;
+              // EOT for OPENING: L_IS drops to ~0 when each PA-04 hits its
+              // internal extend limit (motor circuit opens). Same low-end-
+              // readable pattern as CLOSING's R_IS check. travel_timeout
+              // below is the failsafe if either side never hits its limit.
+              float eot = id(eot_v).state;
+              float al  = id(a_lis).state;
+              float bl  = id(b_lis).state;
+              return (al < eot && bl < eot);
           timeout: !lambda return (uint32_t)(id(travel_timeout_s).state * 1000);
       - light.turn_off:
           id: lpwm
@@ -549,9 +723,24 @@ script:
       - switch.turn_off: bts_a_enable
       - switch.turn_off: bts_b_enable
       - lambda: |-
-          if (id(lift_state) == 1) {
+          // ESPHome's wait_until continues on either success OR timeout, so
+          // we have to re-check the condition here to tell the two apart.
+          if (id(lift_state) != 1) return;        // preempted — leave alone
+          float eot = id(eot_v).state;
+          bool reached = (id(a_lis).state < eot) && (id(b_lis).state < eot);
+          if (reached) {
             id(lift_state) = 2;
             ESP_LOGI("lift", "→ OPEN");
+            // Endstops should both be released by now (we extended away
+            // from the retracted endpoint). Warn if one's still tripped —
+            // that actuator may not have moved.
+            if (id(endstop_a).state || id(endstop_b).state) {
+              ESP_LOGW("lift", "OPEN reached but endstop still tripped (a=%d b=%d) — check actuator",
+                       id(endstop_a).state, id(endstop_b).state);
+            }
+          } else {
+            id(lift_state) = 5;
+            ESP_LOGW("lift", "OPENING timeout — L_IS never collapsed (→ FAULT)");
           }
 
   # ---- CLOSE sequence ----------------------------------------------------
@@ -597,12 +786,33 @@ script:
       - switch.turn_off: bts_a_enable
       - switch.turn_off: bts_b_enable
       - lambda: |-
-          if (id(lift_state) == 3) {
+          // Re-check the R_IS condition: wait_until continues on either
+          // success OR timeout, so we need to disambiguate explicitly.
+          if (id(lift_state) != 3) return;        // preempted — leave alone
+          float eot = id(eot_v).state;
+          bool reached = (id(a_ris).state < eot) && (id(b_ris).state < eot);
+          if (reached) {
             id(lift_state) = 4;
             ESP_LOGI("lift", "→ COOLDOWN");
+            // Sanity check: both endstops should now read tripped (we just
+            // retracted to the calibrated home). If one or both are off,
+            // the actuator stopped short of the endstop's mount position.
+            // Don't FAULT — could be travel variance — but flag clearly.
+            if (!id(endstop_a).state || !id(endstop_b).state) {
+              ESP_LOGW("lift", "CLOSED reached (R_IS dropped) but endstop not tripped (a=%d b=%d) — actuator may be short of home",
+                       id(endstop_a).state, id(endstop_b).state);
+            }
           } else {
-            return;  // FAULT — skip screen retract + cooldown
+            id(lift_state) = 5;
+            ESP_LOGW("lift", "CLOSING timeout — R_IS never collapsed (→ FAULT)");
           }
+      # If FAULT, release the screen here too — the cooldown block below
+      # only runs in state==4 so the screen would otherwise stay energized.
+      - if:
+          condition:
+            lambda: return id(lift_state) == 5;
+          then:
+            - switch.turn_off: screen_relay
       - if:
           condition:
             lambda: return id(lift_state) == 4;
@@ -626,12 +836,12 @@ script:
           ESP_LOGI("lift", "cooldown done → CLOSED");
 
   # ---- Boot reconciliation ----------------------------------------------
-  # Wait for WiFi before bothering the AVR/projector. Default to INDOOR mode
-  # (we boot CLOSED) and ask the projector its power state so HA can see it.
-  # Skip avr_indoor if the user already pressed the wall button before WiFi
-  # came up — open_lift's avr_outdoor would have failed silently then, but
-  # blindly overwriting it with INDOOR here would leave the AVR wrong while
-  # the box is OPEN.
+  # Derive the initial state from the physical endstops once they've settled,
+  # then route AVR mode accordingly. This handles power-loss-while-open
+  # cleanly — without it, on_boot's enter_closed would have left us thinking
+  # the box was closed when the actuators are actually extended.
+  # Asymmetric endstops (one tripped, one not) is ambiguous → FAULT so the
+  # user can investigate before commanding more motion.
   - id: boot_reconcile
     then:
       - wait_until:
@@ -639,11 +849,30 @@ script:
             wifi.connected:
           timeout: 30s
       - delay: 1s
+      - lambda: |-
+          bool a = id(endstop_a).state;
+          bool b = id(endstop_b).state;
+          if (a && b) {
+            // Already CLOSED from enter_closed — leave state alone.
+            ESP_LOGI("lift", "boot reconcile: both endstops tripped → CLOSED (confirmed)");
+          } else if (!a && !b) {
+            // Box was physically extended at boot — recover OPEN state.
+            id(lift_state) = 2;
+            ESP_LOGI("lift", "boot reconcile: neither endstop tripped → OPEN (recovered)");
+          } else {
+            id(lift_state) = 5;
+            ESP_LOGW("lift", "boot reconcile: endstops asymmetric (a=%d b=%d) → FAULT", a, b);
+          }
       - if:
           condition:
             lambda: return id(lift_state) == 0;
           then:
             - script.execute: avr_indoor
+      - if:
+          condition:
+            lambda: return id(lift_state) == 2;
+          then:
+            - script.execute: avr_outdoor
       - script.execute: projector_query_state
 
   # ===========================================================================
@@ -775,10 +1004,203 @@ script:
           ::close(s);
           ESP_LOGI("pjlink", "POWR? → %s", resp.c_str());
 
+  # ---- TEMPORARY: endstop relocation bench test --------------------------
+  # New endstop semantics: endstop_a is tripped when actuator A is at its
+  # fully-retracted endpoint. So a useful test is "leaves and returns":
+  #
+  #   Per cycle (precondition: endstop tripped, actuator at home):
+  #     1. Extend actuator 1
+  #     2. Time-to-release: wait_until endstop_a OFF, log delta
+  #     3. Continue extending +2 s to get well clear
+  #     4. Stop
+  #     5. Retract actuator 1
+  #     6. Time-to-re-trip: wait_until endstop_a ON, log delta (20 s timeout
+  #        is enough for a full retract from full extension at 0.6"/s)
+  #     7. Stop
+  #
+  # Never touches bts_b_enable as a driver; lpwm/rpwm never overlap.
+  # mode: single — re-pressing the button while it's running is a no-op.
+  # Stoppable via script.stop from emergency_stop / STOP button.
+  # If the initial endstop reads OFF, the precondition isn't met → log + skip.
+  - id: test_endstop_a_cycle
+    mode: single
+    then:
+      - lambda: |-
+          ESP_LOGI("test", "TEST start — initial endstop_1=%d jog_pct=%.0f%%",
+                   id(endstop_a).state, id(jog_pct).state);
+      - if:
+          condition:
+            lambda: return !id(endstop_a).state;
+          then:
+            - logger.log:
+                format: "TEST aborted — endstop 1 must be tripped at start (actuator at retracted home)"
+                level: WARN
+      - if:
+          condition:
+            lambda: return id(endstop_a).state;
+          then:
+            - repeat:
+                count: 3
+                then:
+                  - lambda: |-
+                      ESP_LOGI("test", "cycle %d: extending actuator 1 (waiting for endstop release)",
+                               (int)(iteration + 1));
+                  - light.turn_off: { id: rpwm, transition_length: 0s }
+                  - switch.turn_off: bts_b_enable
+                  - delay: 50ms
+                  - switch.turn_on: bts_a_enable
+                  - light.turn_on:
+                      id: lpwm
+                      brightness: !lambda return id(jog_pct).state / 100.0;
+                      transition_length: 100ms
+                  - wait_until:
+                      condition:
+                        binary_sensor.is_off: endstop_a
+                      timeout: 5s
+                  - lambda: |-
+                      int c = (int)(iteration + 1);
+                      if (!id(endstop_a).state) {
+                        ESP_LOGI("test", "cycle %d: endstop 1 RELEASED", c);
+                      } else {
+                        ESP_LOGW("test", "cycle %d: endstop 1 did NOT release — 5 s timeout", c);
+                      }
+                  # Continue extending 2 s to get well clear of the trip point.
+                  - delay: 2000ms
+                  - light.turn_off: { id: lpwm, transition_length: 100ms }
+                  - delay: 150ms
+                  - switch.turn_off: bts_a_enable
+                  - delay: 500ms
+                  - lambda: |-
+                      ESP_LOGI("test", "cycle %d: retracting actuator 1 (waiting for endstop re-trip)",
+                               (int)(iteration + 1));
+                  - light.turn_off: { id: lpwm, transition_length: 0s }
+                  - delay: 50ms
+                  - switch.turn_on: bts_a_enable
+                  - light.turn_on:
+                      id: rpwm
+                      brightness: !lambda return id(jog_pct).state / 100.0;
+                      transition_length: 100ms
+                  - wait_until:
+                      condition:
+                        binary_sensor.is_on: endstop_a
+                      timeout: 20s
+                  - lambda: |-
+                      int c = (int)(iteration + 1);
+                      if (id(endstop_a).state) {
+                        ESP_LOGI("test", "cycle %d: endstop 1 RE-TRIPPED", c);
+                      } else {
+                        ESP_LOGW("test", "cycle %d: endstop 1 did NOT re-trip — 20 s timeout", c);
+                      }
+                  # Let the actuator settle into the PA-04 internal limit
+                  # for ~500 ms before we stop the retract.
+                  - delay: 500ms
+                  - light.turn_off: { id: rpwm, transition_length: 100ms }
+                  - delay: 150ms
+                  - switch.turn_off: bts_a_enable
+                  - delay: 1000ms
+      - logger.log:
+          format: "TEST complete"
+          level: INFO
+
+  # ---- TEMPORARY: endstop 2 / actuator 2 mirror of the above --------------
+  - id: test_endstop_b_cycle
+    mode: single
+    then:
+      - lambda: |-
+          ESP_LOGI("test", "TEST start — initial endstop_2=%d jog_pct=%.0f%%",
+                   id(endstop_b).state, id(jog_pct).state);
+      - if:
+          condition:
+            lambda: return !id(endstop_b).state;
+          then:
+            - logger.log:
+                format: "TEST aborted — endstop 2 must be tripped at start (actuator at retracted home)"
+                level: WARN
+      - if:
+          condition:
+            lambda: return id(endstop_b).state;
+          then:
+            - repeat:
+                count: 3
+                then:
+                  - lambda: |-
+                      ESP_LOGI("test", "cycle %d: extending actuator 2 (waiting for endstop release)",
+                               (int)(iteration + 1));
+                  - light.turn_off: { id: rpwm, transition_length: 0s }
+                  - switch.turn_off: bts_a_enable
+                  - delay: 50ms
+                  - switch.turn_on: bts_b_enable
+                  - light.turn_on:
+                      id: lpwm
+                      brightness: !lambda return id(jog_pct).state / 100.0;
+                      transition_length: 100ms
+                  - wait_until:
+                      condition:
+                        binary_sensor.is_off: endstop_b
+                      timeout: 5s
+                  - lambda: |-
+                      int c = (int)(iteration + 1);
+                      if (!id(endstop_b).state) {
+                        ESP_LOGI("test", "cycle %d: endstop 2 RELEASED", c);
+                      } else {
+                        ESP_LOGW("test", "cycle %d: endstop 2 did NOT release — 5 s timeout", c);
+                      }
+                  - delay: 2000ms
+                  - light.turn_off: { id: lpwm, transition_length: 100ms }
+                  - delay: 150ms
+                  - switch.turn_off: bts_b_enable
+                  - delay: 500ms
+                  - lambda: |-
+                      ESP_LOGI("test", "cycle %d: retracting actuator 2 (waiting for endstop re-trip)",
+                               (int)(iteration + 1));
+                  - light.turn_off: { id: lpwm, transition_length: 0s }
+                  - delay: 50ms
+                  - switch.turn_on: bts_b_enable
+                  - light.turn_on:
+                      id: rpwm
+                      brightness: !lambda return id(jog_pct).state / 100.0;
+                      transition_length: 100ms
+                  - wait_until:
+                      condition:
+                        binary_sensor.is_on: endstop_b
+                      timeout: 20s
+                  - lambda: |-
+                      int c = (int)(iteration + 1);
+                      if (id(endstop_b).state) {
+                        ESP_LOGI("test", "cycle %d: endstop 2 RE-TRIPPED", c);
+                      } else {
+                        ESP_LOGW("test", "cycle %d: endstop 2 did NOT re-trip — 20 s timeout", c);
+                      }
+                  - delay: 500ms
+                  - light.turn_off: { id: rpwm, transition_length: 100ms }
+                  - delay: 150ms
+                  - switch.turn_off: bts_b_enable
+                  - delay: 1000ms
+      - logger.log:
+          format: "TEST complete"
+          level: INFO
+
 # ===========================================================================
 # Diagnostic buttons — bench bring-up + manual mode triggers
+# Safety controls live at the top so they're easy to find in the web UI.
 # ===========================================================================
 button:
+  # ----- EMERGENCY STOP --------------------------------------------------
+  # Kills every motor instantly + drops the screen + marks state=FAULT.
+  # Stops all in-flight motion scripts before cutting PWM/BTS so their
+  # delays / wait_until can't resume after this fires. Recover via
+  # "Diag: reset to CLOSED" once the box is in a known-safe position.
+  - platform: template
+    name: "!! STOP — kill all motion"
+    on_press:
+      - script.execute: emergency_stop
+
+  # Hardware-grade backstop: full ESP32 reboot. Use if STOP doesn't behave
+  # (firmware wedge / scheduler stuck). All GPIOs return to power-on
+  # defaults — BTS EN drops, PWM stops, motors coast. ~5 s downtime.
+  - platform: restart
+    name: "!! Reboot ESP32"
+
   - platform: template
     name: "Diag: jog extend 500ms"
     on_press:
@@ -808,6 +1230,11 @@ button:
       - switch.turn_off: bts_b_enable
 
   - platform: template
+    name: "Wall button (virtual)"
+    on_press:
+      - script.execute: wall_press
+
+  - platform: template
     name: "Diag: reset to CLOSED"
     on_press:
       - script.execute: enter_closed
@@ -832,3 +1259,18 @@ button:
     name: "Diag: Projector POWR 0"
     on_press:
       - script.execute: projector_power_off
+
+  # ----- TEMPORARY: endstop relocation bench test --------------------------
+  # Added 2026-06-30 to validate endstop A after relocation to actuator 1.
+  # Wraps the test script below so STOP can interrupt mid-cycle via
+  # script.stop. Remove this button + its script after the relocated
+  # endstops + IS-pin pulldown mod are both validated.
+  - platform: template
+    name: "Test: endstop 1 trip cycle (3x)"
+    on_press:
+      - script.execute: test_endstop_a_cycle
+
+  - platform: template
+    name: "Test: endstop 2 trip cycle (3x)"
+    on_press:
+      - script.execute: test_endstop_b_cycle
