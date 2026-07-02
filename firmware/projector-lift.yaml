@@ -102,7 +102,7 @@ web_server:
   port: 80
   version: 3
   ota: false
-  log: false
+  log: true
 
 # ===========================================================================
 # Tunables — HA Number entities so calibration doesn't need a re-flash.
@@ -138,7 +138,7 @@ number:
     min_value: 30
     max_value: 100
     step: 5
-    initial_value: 100
+    initial_value: 70
     restore_value: true
     optimistic: true
     unit_of_measurement: "%"
@@ -166,12 +166,23 @@ number:
     unit_of_measurement: "%"
 
   - platform: template
-    name: "End-of-travel threshold (PLACEHOLDER — calibrate)"
+    name: "End-of-travel threshold"
     id: eot_v
     min_value: 0.00
     max_value: 1.50
     step: 0.01
-    initial_value: 0.30
+    initial_value: 0.18
+    restore_value: true
+    optimistic: true
+    unit_of_measurement: V
+
+  - platform: template
+    name: "Stall threshold"
+    id: stall_v
+    min_value: 0.30
+    max_value: 3.20
+    step: 0.05
+    initial_value: 0.50
     restore_value: true
     optimistic: true
     unit_of_measurement: V
@@ -193,7 +204,7 @@ number:
     min_value: 5
     max_value: 60
     step: 1
-    initial_value: 15
+    initial_value: 30
     restore_value: true
     optimistic: true
     unit_of_measurement: s
@@ -204,7 +215,7 @@ number:
     min_value: 30
     max_value: 100
     step: 5
-    initial_value: 40
+    initial_value: 70
     restore_value: true
     optimistic: true
     unit_of_measurement: "%"
@@ -219,6 +230,18 @@ globals:
   - id: avr_monitor_state
     type: int
     initial_value: '-1'
+  # wait_until debounce timers + exit-reason for open_lift / close_lift.
+  # Reset to 0 before each wait_until; the condition-lambda accumulates them.
+  # exit_reason: 0=still running, 1=EOT reached, 2=stall detected
+  - id: is_eot_low_since
+    type: uint32_t
+    initial_value: '0'
+  - id: is_stall_high_since
+    type: uint32_t
+    initial_value: '0'
+  - id: wait_exit_reason
+    type: int
+    initial_value: '0'
 
 # ===========================================================================
 # PWM outputs — LEDC at 20 kHz (above hearing) for motors; fan PWM at 25 kHz
@@ -333,6 +356,8 @@ switch:
           id(jog_a_down).publish_state(false);
           id(jog_b_up).publish_state(false);
           id(jog_b_down).publish_state(false);
+          id(jog_both_up).publish_state(false);
+          id(jog_both_down).publish_state(false);
       - light.turn_off: { id: rpwm, transition_length: 0s }
       - switch.turn_off: bts_b_enable
       - delay: 50ms
@@ -356,6 +381,8 @@ switch:
           id(jog_a_up).publish_state(false);
           id(jog_b_up).publish_state(false);
           id(jog_b_down).publish_state(false);
+          id(jog_both_up).publish_state(false);
+          id(jog_both_down).publish_state(false);
       - light.turn_off: { id: lpwm, transition_length: 0s }
       - switch.turn_off: bts_b_enable
       - delay: 50ms
@@ -379,6 +406,8 @@ switch:
           id(jog_a_up).publish_state(false);
           id(jog_a_down).publish_state(false);
           id(jog_b_down).publish_state(false);
+          id(jog_both_up).publish_state(false);
+          id(jog_both_down).publish_state(false);
       - light.turn_off: { id: rpwm, transition_length: 0s }
       - switch.turn_off: bts_a_enable
       - delay: 50ms
@@ -402,6 +431,8 @@ switch:
           id(jog_a_up).publish_state(false);
           id(jog_a_down).publish_state(false);
           id(jog_b_up).publish_state(false);
+          id(jog_both_up).publish_state(false);
+          id(jog_both_down).publish_state(false);
       - light.turn_off: { id: lpwm, transition_length: 0s }
       - switch.turn_off: bts_a_enable
       - delay: 50ms
@@ -413,6 +444,63 @@ switch:
     turn_off_action:
       - light.turn_off: { id: rpwm, transition_length: 100ms }
       - delay: 150ms
+      - switch.turn_off: bts_b_enable
+
+  # ----- Both-actuator jogs (in-sync leveling / travel check) -------------
+  # Same pattern as the per-actuator jogs, but enables BOTH BTS modules so
+  # A and B drive together at the same duty. No endstop cutoff — user is
+  # watching; PA-04 internal 8" limits are mechanical backup at both ends
+  # (drawer slides are 12" so they can't be the failure surface).
+  - platform: template
+    name: "Level: both up (extend)"
+    id: jog_both_up
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+    turn_on_action:
+      - lambda: |-
+          id(jog_a_up).publish_state(false);
+          id(jog_a_down).publish_state(false);
+          id(jog_b_up).publish_state(false);
+          id(jog_b_down).publish_state(false);
+          id(jog_both_down).publish_state(false);
+      - light.turn_off: { id: rpwm, transition_length: 0s }
+      - delay: 50ms
+      - switch.turn_on: bts_a_enable
+      - switch.turn_on: bts_b_enable
+      - light.turn_on:
+          id: lpwm
+          brightness: !lambda return id(jog_pct).state / 100.0;
+          transition_length: 100ms
+    turn_off_action:
+      - light.turn_off: { id: lpwm, transition_length: 100ms }
+      - delay: 150ms
+      - switch.turn_off: bts_a_enable
+      - switch.turn_off: bts_b_enable
+
+  - platform: template
+    name: "Level: both down (retract)"
+    id: jog_both_down
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+    turn_on_action:
+      - lambda: |-
+          id(jog_a_up).publish_state(false);
+          id(jog_a_down).publish_state(false);
+          id(jog_b_up).publish_state(false);
+          id(jog_b_down).publish_state(false);
+          id(jog_both_up).publish_state(false);
+      - light.turn_off: { id: lpwm, transition_length: 0s }
+      - delay: 50ms
+      - switch.turn_on: bts_a_enable
+      - switch.turn_on: bts_b_enable
+      - light.turn_on:
+          id: rpwm
+          brightness: !lambda return id(jog_pct).state / 100.0;
+          transition_length: 100ms
+    turn_off_action:
+      - light.turn_off: { id: rpwm, transition_length: 100ms }
+      - delay: 150ms
+      - switch.turn_off: bts_a_enable
       - switch.turn_off: bts_b_enable
 
 # ===========================================================================
@@ -431,16 +519,13 @@ binary_sensor:
       - delayed_on: 30ms
       - delayed_off: 30ms
     # Momentary rocker (Square D X-Series SQR14106WH): each press fires once;
-    # release is ignored. Dispatch is endstop-driven, not state-driven —
-    # EITHER deployed-end endstop tripped ⇒ CLOSE, NEITHER tripped ⇒ OPEN.
-    # The asymmetric case (one tripped, one not) routes to CLOSE because OPEN
-    # relies on endstop on_press edges to cut each BTS — an already-tripped
-    # endstop can't re-fire on_press, so its actuator would run unstopped.
-    # CLOSE has no such edge dependency: both actuators retract until each
-    # PA-04's internal limit opens its motor circuit and R_IS collapses.
-    # A press mid-CLOSING reverses to OPENING (open_lift stops close_lift
-    # first); a press mid-OPENING re-executes open_lift (mode:restart,
-    # harmless). FAULT requires manual recovery via "Diag: reset to CLOSED".
+    # release is ignored. Dispatch is endstop-driven (see wall_press script):
+    # both endstops tripped ⇒ box is home ⇒ OPEN. Any endstop off ⇒ CLOSE
+    # (retract to home). FAULT ignores the button — Diag: reset to recover.
+    # Rationale for endstop-driven (vs state-driven) dispatch: the endstops
+    # are the only authoritative "where is the box?" signal. After a FAULT +
+    # Diag reset, or a manual box push, lift_state can be wrong and the
+    # button needs to still drive the box toward a known-safe endpoint.
     on_press:
       - script.execute: wall_press
 
@@ -638,40 +723,34 @@ script:
           level: WARN
 
   # ---- Shared button-press dispatcher -----------------------------------
-  # Same logic as the wall-button on_press; called by both the wall button
-  # and the "Wall button (virtual)" UI button. Endstops are state-confirm
-  # sensors only, so dispatch is primarily state-machine-driven:
-  #   FAULT          → ignore + warn
-  #   CLOSED         → OPEN (log endstop confirmation)
-  #   OPENING / OPEN → CLOSE
-  #   CLOSING        → OPEN (reverses; open_lift is mode:restart)
-  #   COOLDOWN       → cancel timer + OPEN
+  # Called by both the physical wall button and the "Wall button (virtual)"
+  # UI button. Dispatch is ENDSTOP-DRIVEN:
+  #   FAULT                          → ignore + warn (Diag: reset to recover)
+  #   both endstops tripped (=home)  → OPEN  (cancels in-flight COOLDOWN timer)
+  #   otherwise (any endstop off)    → CLOSE (return home, whatever state was)
+  # Rationale: the endstops are the only authoritative "where is the box?"
+  # signal. lift_state can drift out of sync after a FAULT + Diag reset, a
+  # boot glitch, or a user manually pushing the box. Basing dispatch on the
+  # physical position removes those failure modes and ensures the button
+  # always drives the box toward a known-safe endpoint.
   - id: wall_press
     then:
       - lambda: |-
           int s = id(lift_state);
-          bool both_retracted = id(endstop_a).state && id(endstop_b).state;
-          ESP_LOGI("lift", "button press (state=%d both_retracted=%d)", s, both_retracted);
+          bool both_tripped = id(endstop_a).state && id(endstop_b).state;
+          ESP_LOGI("lift", "button press (state=%d both_endstops=%d)", s, both_tripped);
           if (s == 5) {
             ESP_LOGW("lift", "in FAULT — ignoring button; run Diag: reset");
             return;
           }
-          if (s == 1 || s == 2) {
-            // OPENING or OPEN → user wants to close.
-            id(close_lift).execute();
-          } else if (s == 3) {
-            // CLOSING → reverse to OPEN.
-            id(open_lift).execute();
-          } else if (s == 4) {
-            ESP_LOGI("lift", "canceling cooldown");
-            id(cooldown_timer).stop();
-            id(open_lift).execute();
-          } else /* s == 0, CLOSED */ {
-            if (!both_retracted) {
-              ESP_LOGW("lift", "state=CLOSED but endstops disagree (a=%d b=%d) — opening anyway",
-                       id(endstop_a).state, id(endstop_b).state);
+          if (both_tripped) {
+            if (s == 4) {
+              ESP_LOGI("lift", "canceling cooldown");
+              id(cooldown_timer).stop();
             }
             id(open_lift).execute();
+          } else {
+            id(close_lift).execute();
           }
 
   # ---- OPEN sequence -----------------------------------------------------
@@ -705,17 +784,44 @@ script:
           transition_length: !lambda return id(ramp_ms).state;
       # Hold off EOT checks until ramp completes + 250 ms current settle.
       - delay: !lambda return id(ramp_ms).state + 250;
+      # Reset debounce timers + exit reason before entering wait_until.
+      - lambda: |-
+          id(is_eot_low_since) = 0;
+          id(is_stall_high_since) = 0;
+          id(wait_exit_reason) = 0;
       - wait_until:
           condition:
             lambda: |-
               // EOT for OPENING: L_IS drops to ~0 when each PA-04 hits its
-              // internal extend limit (motor circuit opens). Same low-end-
-              // readable pattern as CLOSING's R_IS check. travel_timeout
-              // below is the failsafe if either side never hits its limit.
-              float eot = id(eot_v).state;
-              float al  = id(a_lis).state;
-              float bl  = id(b_lis).state;
-              return (al < eot && bl < eot);
+              // internal extend limit (motor circuit opens). Debounced
+              // 250 ms below eot_v to reject transient cruise dips.
+              // Stall: either L_IS spikes above stall_v for 100 ms sustained
+              // (mechanical obstruction / broken internal limit switch).
+              float eot   = id(eot_v).state;
+              float stall = id(stall_v).state;
+              float al    = id(a_lis).state;
+              float bl    = id(b_lis).state;
+              uint32_t now = millis();
+
+              bool both_low = (al < eot) && (bl < eot);
+              if (!both_low) { id(is_eot_low_since) = 0; }
+              else if (id(is_eot_low_since) == 0) { id(is_eot_low_since) = now; }
+              if (id(is_eot_low_since) != 0 &&
+                  now - id(is_eot_low_since) >= 250) {
+                id(wait_exit_reason) = 1;
+                return true;
+              }
+
+              bool either_high = (al > stall) || (bl > stall);
+              if (!either_high) { id(is_stall_high_since) = 0; }
+              else if (id(is_stall_high_since) == 0) { id(is_stall_high_since) = now; }
+              if (id(is_stall_high_since) != 0 &&
+                  now - id(is_stall_high_since) >= 100) {
+                id(wait_exit_reason) = 2;
+                return true;
+              }
+
+              return false;
           timeout: !lambda return (uint32_t)(id(travel_timeout_s).state * 1000);
       - light.turn_off:
           id: lpwm
@@ -723,12 +829,10 @@ script:
       - switch.turn_off: bts_a_enable
       - switch.turn_off: bts_b_enable
       - lambda: |-
-          // ESPHome's wait_until continues on either success OR timeout, so
-          // we have to re-check the condition here to tell the two apart.
+          // Distinguish the three ways wait_until can end.
           if (id(lift_state) != 1) return;        // preempted — leave alone
-          float eot = id(eot_v).state;
-          bool reached = (id(a_lis).state < eot) && (id(b_lis).state < eot);
-          if (reached) {
+          int reason = id(wait_exit_reason);
+          if (reason == 1) {
             id(lift_state) = 2;
             ESP_LOGI("lift", "→ OPEN");
             // Endstops should both be released by now (we extended away
@@ -738,6 +842,10 @@ script:
               ESP_LOGW("lift", "OPEN reached but endstop still tripped (a=%d b=%d) — check actuator",
                        id(endstop_a).state, id(endstop_b).state);
             }
+          } else if (reason == 2) {
+            id(lift_state) = 5;
+            ESP_LOGW("lift", "OPENING stall detected — L_IS above %.2f V (a=%.2f b=%.2f) → FAULT",
+                     id(stall_v).state, id(a_lis).state, id(b_lis).state);
           } else {
             id(lift_state) = 5;
             ESP_LOGW("lift", "OPENING timeout — L_IS never collapsed (→ FAULT)");
@@ -766,19 +874,44 @@ script:
           brightness: !lambda return id(cruise_pct).state / 100.0;
           transition_length: !lambda return id(ramp_ms).state;
       - delay: !lambda return id(ramp_ms).state + 250;
+      # Reset debounce timers + exit reason before entering wait_until.
+      - lambda: |-
+          id(is_eot_low_since) = 0;
+          id(is_stall_high_since) = 0;
+          id(wait_exit_reason) = 0;
       - wait_until:
           condition:
             lambda: |-
-              // EOT for CLOSING is current-drop on R_IS: when each PA-04 hits
-              // its internal retract limit, the limit switch opens the motor
-              // circuit and IS-pin voltage falls toward 0. The high end of
-              // the IS range saturates the ADC (on-module 10 kΩ pulldown is
-              // too high a value for the operating current), but the low end
-              // reads cleanly — "below eot_v on both sides" is the signal.
-              float eot = id(eot_v).state;
-              float ar  = id(a_ris).state;
-              float br  = id(b_ris).state;
-              return (ar < eot && br < eot);
+              // EOT for CLOSING: R_IS drops to ~0 when each PA-04 hits its
+              // internal retract limit. Debounced 250 ms below eot_v to
+              // reject transient cruise dips.
+              // Stall: either R_IS spikes above stall_v for 100 ms sustained
+              // (mechanical obstruction / cable snag on retract).
+              float eot   = id(eot_v).state;
+              float stall = id(stall_v).state;
+              float ar    = id(a_ris).state;
+              float br    = id(b_ris).state;
+              uint32_t now = millis();
+
+              bool both_low = (ar < eot) && (br < eot);
+              if (!both_low) { id(is_eot_low_since) = 0; }
+              else if (id(is_eot_low_since) == 0) { id(is_eot_low_since) = now; }
+              if (id(is_eot_low_since) != 0 &&
+                  now - id(is_eot_low_since) >= 250) {
+                id(wait_exit_reason) = 1;
+                return true;
+              }
+
+              bool either_high = (ar > stall) || (br > stall);
+              if (!either_high) { id(is_stall_high_since) = 0; }
+              else if (id(is_stall_high_since) == 0) { id(is_stall_high_since) = now; }
+              if (id(is_stall_high_since) != 0 &&
+                  now - id(is_stall_high_since) >= 100) {
+                id(wait_exit_reason) = 2;
+                return true;
+              }
+
+              return false;
           timeout: !lambda return (uint32_t)(id(travel_timeout_s).state * 1000);
       - light.turn_off:
           id: rpwm
@@ -786,12 +919,10 @@ script:
       - switch.turn_off: bts_a_enable
       - switch.turn_off: bts_b_enable
       - lambda: |-
-          // Re-check the R_IS condition: wait_until continues on either
-          // success OR timeout, so we need to disambiguate explicitly.
+          // Distinguish the three ways wait_until can end.
           if (id(lift_state) != 3) return;        // preempted — leave alone
-          float eot = id(eot_v).state;
-          bool reached = (id(a_ris).state < eot) && (id(b_ris).state < eot);
-          if (reached) {
+          int reason = id(wait_exit_reason);
+          if (reason == 1) {
             id(lift_state) = 4;
             ESP_LOGI("lift", "→ COOLDOWN");
             // Sanity check: both endstops should now read tripped (we just
@@ -802,6 +933,10 @@ script:
               ESP_LOGW("lift", "CLOSED reached (R_IS dropped) but endstop not tripped (a=%d b=%d) — actuator may be short of home",
                        id(endstop_a).state, id(endstop_b).state);
             }
+          } else if (reason == 2) {
+            id(lift_state) = 5;
+            ESP_LOGW("lift", "CLOSING stall detected — R_IS above %.2f V (a=%.2f b=%.2f) → FAULT",
+                     id(stall_v).state, id(a_ris).state, id(b_ris).state);
           } else {
             id(lift_state) = 5;
             ESP_LOGW("lift", "CLOSING timeout — R_IS never collapsed (→ FAULT)");
