@@ -18,12 +18,14 @@
 #   GPIO23  ← Prusa endstop A SIG (deployed-end, NO-to-GND, INPUT_PULLUP)
 #   GPIO22  ← Prusa endstop B SIG (deployed-end, NO-to-GND, INPUT_PULLUP)
 #
-# CONTROL MODEL — single momentary button, state-machine-driven dispatch:
-#   state=CLOSED        ⇒ press triggers OPEN  (with endstop confirmation logged)
-#   state=OPENING/OPEN  ⇒ press triggers CLOSE
-#   state=CLOSING       ⇒ press REVERSES to OPEN (open_lift stops close_lift first)
-#   state=COOLDOWN      ⇒ press cancels the cooldown timer and reopens
-#   state=FAULT         ⇒ press is ignored (manual Diag reset required)
+# CONTROL MODEL — single momentary button, endstop-driven dispatch (see
+# ProjectorLift::on_button_press in components/projector_lift/):
+#   both endstops tripped      ⇒ box is home ⇒ press OPENs
+#                                  (cancels COOLDOWN timers if in COOLDOWN)
+#   otherwise (any endstop off) ⇒ press CLOSEs (return home from whatever state)
+#   state=FAULT                ⇒ press is ignored (manual Diag reset required)
+# Rationale: endstops are the only authoritative "where is the box?" signal;
+# lift_state can drift after a Diag reset, boot glitch, or manual push.
 #
 # Endstops are pure state-confirmation sensors — they do NOT cut motors.
 # New rails travel 12" vs the actuators' 8" stroke, so the PA-04 internal
@@ -61,10 +63,12 @@ esphome:
   includes:
     - includes.h
   on_boot:
-    # Pull every output to a known-safe state before WiFi is up.
+    # Pull every output to a known-safe state before WiFi is up. The
+    # projector_lift component also does this in its setup(); this is a
+    # belt-and-suspenders call for the -100 priority window.
     - priority: -100
       then:
-        - script.execute: enter_closed
+        - lambda: id(lift).force_closed();
     # Once the network is up, reconcile AVR + projector to current state.
     - priority: -200
       then:
@@ -103,6 +107,54 @@ web_server:
   version: 3
   ota: false
   log: true
+
+# ===========================================================================
+# projector_lift external component — owns the OPEN / CLOSE / EMERGENCY-STOP
+# state machine that used to live below as scripts + globals. See
+# components/projector_lift/ for the C++ implementation. Everything else
+# in this YAML (tunables, GPIOs, sensors, cover, AVR/PJLink scripts, jogs,
+# buttons) stays where it is — this block just wires refs into the C++.
+# ===========================================================================
+external_components:
+  - source: components
+
+projector_lift:
+  id: lift
+  bts_a_enable: bts_a_enable
+  bts_b_enable: bts_b_enable
+  screen_relay: screen_relay
+  rpwm: rpwm
+  lpwm: lpwm
+  fan_pwm: fan_pwm
+  a_ris: a_ris
+  a_lis: a_lis
+  b_ris: b_ris
+  b_lis: b_lis
+  endstop_a: endstop_a
+  endstop_b: endstop_b
+  cruise_pct: cruise_pct
+  ramp_ms: ramp_ms
+  eot_v: eot_v
+  stall_v: stall_v
+  travel_timeout_s: travel_timeout_s
+  fan_running_pct: fan_running_pct
+  fan_cooldown_pct: fan_cooldown_pct
+  screen_delay_s: screen_delay_s
+  cooldown_min: cooldown_min
+  # C++ fires these before it starts moving the actuators.
+  on_opening:
+    - script.execute: projector_power_on
+    - script.execute: avr_outdoor
+  on_closing:
+    - script.execute: projector_power_off
+    - script.execute: avr_indoor
+  # C++ fires these from reconcile_from_endstops() (see boot_reconcile).
+  on_boot_closed:
+    - script.execute: avr_indoor
+  on_boot_open:
+    - script.execute: avr_outdoor
+  on_boot_reconciled:
+    - script.execute: projector_query_state
 
 # ===========================================================================
 # Tunables — HA Number entities so calibration doesn't need a re-flash.
@@ -222,26 +274,13 @@ number:
     mode: slider
 
 globals:
-  # 0=CLOSED 1=OPENING 2=OPEN 3=CLOSING 4=COOLDOWN 5=FAULT
-  - id: lift_state
-    type: int
-    initial_value: '0'
+  # lift_state + wait_until debounce timers moved into the projector_lift C++
+  # component. Only the AVR monitor-mode poll result stays here since the
+  # AVR client stays in YAML.
   # Last observed AVR VSMONI? response: -1 unknown · 1 MONI1 · 2 MONI2 · 3 AUTO
   - id: avr_monitor_state
     type: int
     initial_value: '-1'
-  # wait_until debounce timers + exit-reason for open_lift / close_lift.
-  # Reset to 0 before each wait_until; the condition-lambda accumulates them.
-  # exit_reason: 0=still running, 1=EOT reached, 2=stall detected
-  - id: is_eot_low_since
-    type: uint32_t
-    initial_value: '0'
-  - id: is_stall_high_since
-    type: uint32_t
-    initial_value: '0'
-  - id: wait_exit_reason
-    type: int
-    initial_value: '0'
 
 # ===========================================================================
 # PWM outputs — LEDC at 20 kHz (above hearing) for motors; fan PWM at 25 kHz
@@ -320,21 +359,16 @@ switch:
     id: projector_switch
     icon: mdi:projector
     optimistic: false
+    # is_projector_active() is true for OPENING or OPEN.
     lambda: |-
-      int s = id(lift_state);
-      return s == 1 || s == 2;
+      return id(lift).is_projector_active();
+    # request_open() / request_close() are no-ops in inapplicable states
+    # (OPEN, CLOSED / COOLDOWN) and skip cleanly from FAULT with a warning,
+    # so callers don't need per-state guards.
     turn_on_action:
-      - lambda: |-
-          int s = id(lift_state);
-          if (s == 0) {
-            id(open_lift).execute();
-          } else if (s == 4) {
-            id(cooldown_timer).stop();
-            id(open_lift).execute();
-          }
+      - lambda: id(lift).request_open();
     turn_off_action:
-      - lambda: |-
-          if (id(lift_state) == 2) id(close_lift).execute();
+      - lambda: id(lift).request_close();
 
   # ----- Per-actuator leveling jogs ---------------------------------------
   # Click ON to start moving, click OFF to stop. NO software timeout.
@@ -519,7 +553,7 @@ binary_sensor:
       - delayed_on: 30ms
       - delayed_off: 30ms
     # Momentary rocker (Square D X-Series SQR14106WH): each press fires once;
-    # release is ignored. Dispatch is endstop-driven (see wall_press script):
+    # release is ignored. Dispatch is endstop-driven (see on_button_press):
     # both endstops tripped ⇒ box is home ⇒ OPEN. Any endstop off ⇒ CLOSE
     # (retract to home). FAULT ignores the button — Diag: reset to recover.
     # Rationale for endstop-driven (vs state-driven) dispatch: the endstops
@@ -527,7 +561,7 @@ binary_sensor:
     # Diag reset, or a manual box push, lift_state can be wrong and the
     # button needs to still drive the box toward a known-safe endpoint.
     on_press:
-      - script.execute: wall_press
+      - lambda: id(lift).on_button_press();
 
   # Endstops are pure state-confirmation sensors under the new design — they
   # do NOT cut motors. Motors run to the PA-04 internal limit and stop when
@@ -546,11 +580,11 @@ binary_sensor:
     on_press:
       then:
         - lambda: |-
-            ESP_LOGI("lift", "endstop A tripped — actuator 1 at retracted endpoint (state=%d)", id(lift_state));
+            ESP_LOGI("lift", "endstop A tripped — actuator 1 at retracted endpoint (state=%d)", id(lift).get_state_int());
     on_release:
       then:
         - lambda: |-
-            ESP_LOGI("lift", "endstop A released — actuator 1 left retracted endpoint (state=%d)", id(lift_state));
+            ESP_LOGI("lift", "endstop A released — actuator 1 left retracted endpoint (state=%d)", id(lift).get_state_int());
 
   - platform: gpio
     pin:
@@ -565,11 +599,11 @@ binary_sensor:
     on_press:
       then:
         - lambda: |-
-            ESP_LOGI("lift", "endstop B tripped — actuator 2 at retracted endpoint (state=%d)", id(lift_state));
+            ESP_LOGI("lift", "endstop B tripped — actuator 2 at retracted endpoint (state=%d)", id(lift).get_state_int());
     on_release:
       then:
         - lambda: |-
-            ESP_LOGI("lift", "endstop B released — actuator 2 left retracted endpoint (state=%d)", id(lift_state));
+            ESP_LOGI("lift", "endstop B released — actuator 2 left retracted endpoint (state=%d)", id(lift).get_state_int());
 
 sensor:
   - platform: adc
@@ -653,18 +687,16 @@ cover:
     optimistic: true
     assumed_state: true
     open_action:
-      - lambda: |-
-          int s = id(lift_state);
-          if (s == 0) id(open_lift).execute();
-          else if (s == 4) {
-            id(cooldown_timer).stop();
-            id(open_lift).execute();
-          }
+      - lambda: id(lift).request_open();
     close_action:
-      - lambda: |-
-          if (id(lift_state) == 2) id(close_lift).execute();
+      - lambda: id(lift).request_close();
+    # STOP also cancels any in-flight endstop-test script (those live in
+    # YAML and the C++ component can't reach them). emergency_stop() then
+    # kills all motion + drops the screen + sets state=FAULT.
     stop_action:
-      - script.execute: emergency_stop
+      - script.stop: test_endstop_a_cycle
+      - script.stop: test_endstop_b_cycle
+      - lambda: id(lift).emergency_stop();
 
 # ===========================================================================
 # Periodic AVR state polling — exposes monitor mode to HA while OPEN so HA
@@ -677,7 +709,7 @@ interval:
     then:
       - if:
           condition:
-            lambda: return id(lift_state) == 2;
+            lambda: return id(lift).is_open();
           then:
             - script.execute: avr_query_monitor
 
@@ -685,298 +717,17 @@ interval:
 # Scripts — state transitions + network clients
 # ===========================================================================
 script:
-  # ---- Idle / safety -----------------------------------------------------
-  - id: enter_closed
-    then:
-      - light.turn_off: { id: rpwm,    transition_length: 0s }
-      - light.turn_off: { id: lpwm,    transition_length: 0s }
-      - light.turn_off: { id: fan_pwm, transition_length: 0s }
-      - switch.turn_off: bts_a_enable
-      - switch.turn_off: bts_b_enable
-      - switch.turn_off: screen_relay
-      - lambda: id(lift_state) = 0;
-      - logger.log:
-          format: "→ CLOSED"
-          level: INFO
-
-  - id: emergency_stop
-    then:
-      # Halt every in-flight motion script first — otherwise their delays /
-      # wait_until would resume after this script finishes and re-energize
-      # the motors. Order matters: stop scripts, THEN kill PWM, THEN BTSes.
-      - script.stop: open_lift
-      - script.stop: close_lift
-      - script.stop: test_endstop_a_cycle
-      - script.stop: test_endstop_b_cycle
-      # 0 s transition = instant kill (no fade). Faster than 100 ms is also
-      # safer if a wedged scheduler is the reason we're here.
-      - light.turn_off: { id: rpwm, transition_length: 0s }
-      - light.turn_off: { id: lpwm, transition_length: 0s }
-      - switch.turn_off: bts_a_enable
-      - switch.turn_off: bts_b_enable
-      # Release the screen too — we don't know what position the box is in
-      # so leaving the screen deployed indefinitely is the wrong default.
-      - switch.turn_off: screen_relay
-      - lambda: id(lift_state) = 5;
-      - logger.log:
-          format: "EMERGENCY STOP (state=FAULT) — run 'Diag: reset to CLOSED' to recover"
-          level: WARN
-
-  # ---- Shared button-press dispatcher -----------------------------------
-  # Called by both the physical wall button and the "Wall button (virtual)"
-  # UI button. Dispatch is ENDSTOP-DRIVEN:
-  #   FAULT                          → ignore + warn (Diag: reset to recover)
-  #   both endstops tripped (=home)  → OPEN  (cancels in-flight COOLDOWN timer)
-  #   otherwise (any endstop off)    → CLOSE (return home, whatever state was)
-  # Rationale: the endstops are the only authoritative "where is the box?"
-  # signal. lift_state can drift out of sync after a FAULT + Diag reset, a
-  # boot glitch, or a user manually pushing the box. Basing dispatch on the
-  # physical position removes those failure modes and ensures the button
-  # always drives the box toward a known-safe endpoint.
-  - id: wall_press
-    then:
-      - lambda: |-
-          int s = id(lift_state);
-          bool both_tripped = id(endstop_a).state && id(endstop_b).state;
-          ESP_LOGI("lift", "button press (state=%d both_endstops=%d)", s, both_tripped);
-          if (s == 5) {
-            ESP_LOGW("lift", "in FAULT — ignoring button; run Diag: reset");
-            return;
-          }
-          if (both_tripped) {
-            if (s == 4) {
-              ESP_LOGI("lift", "canceling cooldown");
-              id(cooldown_timer).stop();
-            }
-            id(open_lift).execute();
-          } else {
-            id(close_lift).execute();
-          }
-
-  # ---- OPEN sequence -----------------------------------------------------
-  # Order matters: PJLink first (projector warm-up takes ~30 s in parallel),
-  # then AVR routes to OUTDOOR mode (so the audio chain is ready), then we
-  # drop the screen, kick fans, and ramp the actuators up.
-  - id: open_lift
-    mode: restart
-    then:
-      # Mutual-exclude with close_lift — without this an in-flight CLOSING
-      # would keep ramping RPWM after we set state=OPENING.
-      - script.stop: close_lift
-      - lambda: id(lift_state) = 1;
-      - logger.log:
-          format: "→ OPENING"
-          level: INFO
-      - script.execute: projector_power_on
-      - script.execute: avr_outdoor
-      - switch.turn_on: screen_relay
-      - light.turn_on:
-          id: fan_pwm
-          brightness: !lambda return id(fan_running_pct).state / 100.0;
-          transition_length: 200ms
-      - light.turn_off: { id: rpwm, transition_length: 0s }
-      - delay: 50ms                                              # deadtime
-      - switch.turn_on: bts_a_enable
-      - switch.turn_on: bts_b_enable
-      - light.turn_on:
-          id: lpwm
-          brightness: !lambda return id(cruise_pct).state / 100.0;
-          transition_length: !lambda return id(ramp_ms).state;
-      # Hold off EOT checks until ramp completes + 250 ms current settle.
-      - delay: !lambda return id(ramp_ms).state + 250;
-      # Reset debounce timers + exit reason before entering wait_until.
-      - lambda: |-
-          id(is_eot_low_since) = 0;
-          id(is_stall_high_since) = 0;
-          id(wait_exit_reason) = 0;
-      - wait_until:
-          condition:
-            lambda: |-
-              // EOT for OPENING: L_IS drops to ~0 when each PA-04 hits its
-              // internal extend limit (motor circuit opens). Debounced
-              // 250 ms below eot_v to reject transient cruise dips.
-              // Stall: either L_IS spikes above stall_v for 100 ms sustained
-              // (mechanical obstruction / broken internal limit switch).
-              float eot   = id(eot_v).state;
-              float stall = id(stall_v).state;
-              float al    = id(a_lis).state;
-              float bl    = id(b_lis).state;
-              uint32_t now = millis();
-
-              bool both_low = (al < eot) && (bl < eot);
-              if (!both_low) { id(is_eot_low_since) = 0; }
-              else if (id(is_eot_low_since) == 0) { id(is_eot_low_since) = now; }
-              if (id(is_eot_low_since) != 0 &&
-                  now - id(is_eot_low_since) >= 250) {
-                id(wait_exit_reason) = 1;
-                return true;
-              }
-
-              bool either_high = (al > stall) || (bl > stall);
-              if (!either_high) { id(is_stall_high_since) = 0; }
-              else if (id(is_stall_high_since) == 0) { id(is_stall_high_since) = now; }
-              if (id(is_stall_high_since) != 0 &&
-                  now - id(is_stall_high_since) >= 100) {
-                id(wait_exit_reason) = 2;
-                return true;
-              }
-
-              return false;
-          timeout: !lambda return (uint32_t)(id(travel_timeout_s).state * 1000);
-      - light.turn_off:
-          id: lpwm
-          transition_length: !lambda return id(ramp_ms).state;
-      - switch.turn_off: bts_a_enable
-      - switch.turn_off: bts_b_enable
-      - lambda: |-
-          // Distinguish the three ways wait_until can end.
-          if (id(lift_state) != 1) return;        // preempted — leave alone
-          int reason = id(wait_exit_reason);
-          if (reason == 1) {
-            id(lift_state) = 2;
-            ESP_LOGI("lift", "→ OPEN");
-            // Endstops should both be released by now (we extended away
-            // from the retracted endpoint). Warn if one's still tripped —
-            // that actuator may not have moved.
-            if (id(endstop_a).state || id(endstop_b).state) {
-              ESP_LOGW("lift", "OPEN reached but endstop still tripped (a=%d b=%d) — check actuator",
-                       id(endstop_a).state, id(endstop_b).state);
-            }
-          } else if (reason == 2) {
-            id(lift_state) = 5;
-            ESP_LOGW("lift", "OPENING stall detected — L_IS above %.2f V (a=%.2f b=%.2f) → FAULT",
-                     id(stall_v).state, id(a_lis).state, id(b_lis).state);
-          } else {
-            id(lift_state) = 5;
-            ESP_LOGW("lift", "OPENING timeout — L_IS never collapsed (→ FAULT)");
-          }
-
-  # ---- CLOSE sequence ----------------------------------------------------
-  # PJLink OFF starts the projector's internal cooldown. AVR returns to
-  # INDOOR mode now (per §12 spec); in the expected user flow Apple TV is
-  # already powered down so Zone 2 is silent — there's no audio to cut.
-  - id: close_lift
-    mode: restart
-    then:
-      - script.stop: open_lift
-      - lambda: id(lift_state) = 3;
-      - logger.log:
-          format: "→ CLOSING"
-          level: INFO
-      - script.execute: projector_power_off
-      - script.execute: avr_indoor
-      - light.turn_off: { id: lpwm, transition_length: 0s }
-      - delay: 50ms                                              # deadtime
-      - switch.turn_on: bts_a_enable
-      - switch.turn_on: bts_b_enable
-      - light.turn_on:
-          id: rpwm
-          brightness: !lambda return id(cruise_pct).state / 100.0;
-          transition_length: !lambda return id(ramp_ms).state;
-      - delay: !lambda return id(ramp_ms).state + 250;
-      # Reset debounce timers + exit reason before entering wait_until.
-      - lambda: |-
-          id(is_eot_low_since) = 0;
-          id(is_stall_high_since) = 0;
-          id(wait_exit_reason) = 0;
-      - wait_until:
-          condition:
-            lambda: |-
-              // EOT for CLOSING: R_IS drops to ~0 when each PA-04 hits its
-              // internal retract limit. Debounced 250 ms below eot_v to
-              // reject transient cruise dips.
-              // Stall: either R_IS spikes above stall_v for 100 ms sustained
-              // (mechanical obstruction / cable snag on retract).
-              float eot   = id(eot_v).state;
-              float stall = id(stall_v).state;
-              float ar    = id(a_ris).state;
-              float br    = id(b_ris).state;
-              uint32_t now = millis();
-
-              bool both_low = (ar < eot) && (br < eot);
-              if (!both_low) { id(is_eot_low_since) = 0; }
-              else if (id(is_eot_low_since) == 0) { id(is_eot_low_since) = now; }
-              if (id(is_eot_low_since) != 0 &&
-                  now - id(is_eot_low_since) >= 250) {
-                id(wait_exit_reason) = 1;
-                return true;
-              }
-
-              bool either_high = (ar > stall) || (br > stall);
-              if (!either_high) { id(is_stall_high_since) = 0; }
-              else if (id(is_stall_high_since) == 0) { id(is_stall_high_since) = now; }
-              if (id(is_stall_high_since) != 0 &&
-                  now - id(is_stall_high_since) >= 100) {
-                id(wait_exit_reason) = 2;
-                return true;
-              }
-
-              return false;
-          timeout: !lambda return (uint32_t)(id(travel_timeout_s).state * 1000);
-      - light.turn_off:
-          id: rpwm
-          transition_length: !lambda return id(ramp_ms).state;
-      - switch.turn_off: bts_a_enable
-      - switch.turn_off: bts_b_enable
-      - lambda: |-
-          // Distinguish the three ways wait_until can end.
-          if (id(lift_state) != 3) return;        // preempted — leave alone
-          int reason = id(wait_exit_reason);
-          if (reason == 1) {
-            id(lift_state) = 4;
-            ESP_LOGI("lift", "→ COOLDOWN");
-            // Sanity check: both endstops should now read tripped (we just
-            // retracted to the calibrated home). If one or both are off,
-            // the actuator stopped short of the endstop's mount position.
-            // Don't FAULT — could be travel variance — but flag clearly.
-            if (!id(endstop_a).state || !id(endstop_b).state) {
-              ESP_LOGW("lift", "CLOSED reached (R_IS dropped) but endstop not tripped (a=%d b=%d) — actuator may be short of home",
-                       id(endstop_a).state, id(endstop_b).state);
-            }
-          } else if (reason == 2) {
-            id(lift_state) = 5;
-            ESP_LOGW("lift", "CLOSING stall detected — R_IS above %.2f V (a=%.2f b=%.2f) → FAULT",
-                     id(stall_v).state, id(a_ris).state, id(b_ris).state);
-          } else {
-            id(lift_state) = 5;
-            ESP_LOGW("lift", "CLOSING timeout — R_IS never collapsed (→ FAULT)");
-          }
-      # If FAULT, release the screen here too — the cooldown block below
-      # only runs in state==4 so the screen would otherwise stay energized.
-      - if:
-          condition:
-            lambda: return id(lift_state) == 5;
-          then:
-            - switch.turn_off: screen_relay
-      - if:
-          condition:
-            lambda: return id(lift_state) == 4;
-          then:
-            - delay: !lambda return (uint32_t)(id(screen_delay_s).state * 1000);
-            - switch.turn_off: screen_relay
-            # Step fan down to the lower cooldown duty for the long dwell.
-            - light.turn_on:
-                id: fan_pwm
-                brightness: !lambda return id(fan_cooldown_pct).state / 100.0;
-                transition_length: 1s
-            - script.execute: cooldown_timer
-
-  - id: cooldown_timer
-    mode: restart
-    then:
-      - delay: !lambda return (uint32_t)(id(cooldown_min).state * 60.0 * 1000.0);
-      - light.turn_off: { id: fan_pwm, transition_length: 1s }
-      - lambda: |-
-          id(lift_state) = 0;
-          ESP_LOGI("lift", "cooldown done → CLOSED");
+  # enter_closed, emergency_stop, wall_press, open_lift, close_lift, and
+  # cooldown_timer moved into the projector_lift C++ component. YAML still
+  # owns boot_reconcile (needs wifi.connected wait), the AVR/PJLink clients,
+  # and the temporary endstop bench-test scripts below.
 
   # ---- Boot reconciliation ----------------------------------------------
-  # Derive the initial state from the physical endstops once they've settled,
-  # then route AVR mode accordingly. This handles power-loss-while-open
-  # cleanly — without it, on_boot's enter_closed would have left us thinking
-  # the box was closed when the actuators are actually extended.
-  # Asymmetric endstops (one tripped, one not) is ambiguous → FAULT so the
-  # user can investigate before commanding more motion.
+  # Wait for WiFi + endstop settle, then hand off to the C++ component,
+  # which derives state from physical endstops (handles power-loss-while-
+  # open) and fires on_boot_closed / on_boot_open / on_boot_reconciled up
+  # in the projector_lift block — those hooks run avr_indoor / avr_outdoor
+  # / projector_query_state as needed.
   - id: boot_reconcile
     then:
       - wait_until:
@@ -984,31 +735,7 @@ script:
             wifi.connected:
           timeout: 30s
       - delay: 1s
-      - lambda: |-
-          bool a = id(endstop_a).state;
-          bool b = id(endstop_b).state;
-          if (a && b) {
-            // Already CLOSED from enter_closed — leave state alone.
-            ESP_LOGI("lift", "boot reconcile: both endstops tripped → CLOSED (confirmed)");
-          } else if (!a && !b) {
-            // Box was physically extended at boot — recover OPEN state.
-            id(lift_state) = 2;
-            ESP_LOGI("lift", "boot reconcile: neither endstop tripped → OPEN (recovered)");
-          } else {
-            id(lift_state) = 5;
-            ESP_LOGW("lift", "boot reconcile: endstops asymmetric (a=%d b=%d) → FAULT", a, b);
-          }
-      - if:
-          condition:
-            lambda: return id(lift_state) == 0;
-          then:
-            - script.execute: avr_indoor
-      - if:
-          condition:
-            lambda: return id(lift_state) == 2;
-          then:
-            - script.execute: avr_outdoor
-      - script.execute: projector_query_state
+      - lambda: id(lift).reconcile_from_endstops();
 
   # ===========================================================================
   # AVR Telnet client — Denon AVR-X2800H, port 23. Commands are ASCII,
@@ -1328,7 +1055,12 @@ button:
   - platform: template
     name: "!! STOP — kill all motion"
     on_press:
-      - script.execute: emergency_stop
+      # Stop endstop-test scripts first (they live in YAML, C++ can't reach
+      # them). emergency_stop() cancels scheduled callbacks + kills PWM/BTS
+      # + drops the screen + sets state=FAULT.
+      - script.stop: test_endstop_a_cycle
+      - script.stop: test_endstop_b_cycle
+      - lambda: id(lift).emergency_stop();
 
   # Hardware-grade backstop: full ESP32 reboot. Use if STOP doesn't behave
   # (firmware wedge / scheduler stuck). All GPIOs return to power-on
@@ -1367,12 +1099,12 @@ button:
   - platform: template
     name: "Wall button (virtual)"
     on_press:
-      - script.execute: wall_press
+      - lambda: id(lift).on_button_press();
 
   - platform: template
     name: "Diag: reset to CLOSED"
     on_press:
-      - script.execute: enter_closed
+      - lambda: id(lift).force_closed();
 
   - platform: template
     name: "Diag: AVR → INDOOR"
