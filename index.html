@@ -2993,37 +2993,37 @@
   <!-- BTS7960 #2 R_IS → GPIO34 -->
   <rect class="dest dest-adc" x="40" y="188" width="320" height="24" rx="5"/>
   <text class="dest-lbl" x="52" y="205">BTS7960 #2 · R_IS</text>
-  <text class="dest-sub" x="240" y="205">actuator B extend current</text>
+  <text class="dest-sub" x="240" y="205">actuator B retract current</text>
   <path class="wc-yel" d="M 360 200 L 400 200"/>
 
   <!-- BTS7960 #2 L_IS → GPIO35 -->
   <rect class="dest dest-adc" x="40" y="218" width="320" height="24" rx="5"/>
   <text class="dest-lbl" x="52" y="235">BTS7960 #2 · L_IS</text>
-  <text class="dest-sub" x="240" y="235">actuator B retract current</text>
+  <text class="dest-sub" x="240" y="235">actuator B extend current</text>
   <path class="wc-yel" d="M 360 230 L 400 230"/>
 
   <!-- BTS7960 #1 R_IS → GPIO32 -->
   <rect class="dest dest-adc" x="40" y="248" width="320" height="24" rx="5"/>
   <text class="dest-lbl" x="52" y="265">BTS7960 #1 · R_IS</text>
-  <text class="dest-sub" x="240" y="265">actuator A extend current</text>
+  <text class="dest-sub" x="240" y="265">actuator A retract current</text>
   <path class="wc-yel" d="M 360 260 L 400 260"/>
 
   <!-- BTS7960 #1 L_IS → GPIO33 -->
   <rect class="dest dest-adc" x="40" y="278" width="320" height="24" rx="5"/>
   <text class="dest-lbl" x="52" y="295">BTS7960 #1 · L_IS</text>
-  <text class="dest-sub" x="240" y="295">actuator A retract current</text>
+  <text class="dest-sub" x="240" y="295">actuator A extend current</text>
   <path class="wc-yel" d="M 360 290 L 400 290"/>
 
   <!-- RPWM (both modules in parallel) → GPIO25 -->
   <rect class="dest dest-sig" x="40" y="308" width="320" height="24" rx="5"/>
   <text class="dest-lbl" x="52" y="325">BTS7960 #1 + #2 · RPWM</text>
-  <text class="dest-sub" x="240" y="325">extend PWM (LEDC ch 0, 20 kHz)</text>
+  <text class="dest-sub" x="240" y="325">retract PWM (LEDC ch 0, 20 kHz)</text>
   <path class="wc-grn" d="M 360 320 L 400 320"/>
 
   <!-- LPWM (both modules in parallel) → GPIO26 -->
   <rect class="dest dest-sig" x="40" y="338" width="320" height="24" rx="5"/>
   <text class="dest-lbl" x="52" y="355">BTS7960 #1 + #2 · LPWM</text>
-  <text class="dest-sub" x="240" y="355">retract PWM (LEDC ch 1, 20 kHz)</text>
+  <text class="dest-sub" x="240" y="355">extend PWM (LEDC ch 1, 20 kHz)</text>
   <path class="wc-grn" d="M 360 350 L 400 350"/>
 
   <!-- R_EN + L_EN, BTS7960 #1 only (split from #2 for independent endstop cutoff) → GPIO27 -->
@@ -3129,14 +3129,14 @@
     <tr><td><code>5V / VIN</code></td><td>power in</td><td>5 V rail from Plug 1 pin 2 — feeds onboard AMS1117 (internal 3.3 V), also taps to both BTS7960 VCC pins and to SCREEN plug pin 1 (F-1001 coil + supply). USB and external supply can coexist on this pin via the dev board's power-mux MOSFET, so you can leave USB plugged in for programming.</td><td>blue</td></tr>
     <tr><td><code>3V3</code></td><td>power out</td><td>AMS1117 output, tapped to source the on-board 3.3 V rail that feeds endstop +Vcc on both Prusa headers. <em>Output only — never drive external 3.3 V back into this pin.</em></td><td>orange</td></tr>
     <tr><td><code>GND</code> (×2)</td><td>power in</td><td>logic-side ground · star-tied at PSU output</td><td>black</td></tr>
-    <tr><td><code>GPIO25</code></td><td>output (PWM)</td><td>RPWM (extend) — tied to <em>both</em> BTS7960 RPWM pins in parallel · LEDC ch 0, 20 kHz</td><td>green</td></tr>
-    <tr><td><code>GPIO26</code></td><td>output (PWM)</td><td>LPWM (retract) — tied to <em>both</em> BTS7960 LPWM pins in parallel · LEDC ch 1, 20 kHz</td><td>green</td></tr>
+    <tr><td><code>GPIO25</code></td><td>output (PWM)</td><td>RPWM (retract) — tied to <em>both</em> BTS7960 RPWM pins in parallel · LEDC ch 0, 20 kHz</td><td>green</td></tr>
+    <tr><td><code>GPIO26</code></td><td>output (PWM)</td><td>LPWM (extend) — tied to <em>both</em> BTS7960 LPWM pins in parallel · LEDC ch 1, 20 kHz</td><td>green</td></tr>
     <tr><td><code>GPIO27</code></td><td>output</td><td>BTS7960 <em>#1</em> R_EN + L_EN <em>only</em> — independent enable for actuator A. Firmware drops this LOW on endstop A trip → BTS #1 outputs go hi-Z, actuator A stops while actuator B keeps moving. (Was ganged to both BTS modules pre-2026-06-23; split to give per-actuator endstop cutoff.)</td><td>green</td></tr>
     <tr><td><code>GPIO19</code></td><td>output</td><td>BTS7960 <em>#2</em> R_EN + L_EN <em>only</em> — independent enable for actuator B. Firmware drops this LOW on endstop B trip → BTS #2 outputs go hi-Z, actuator B stops while actuator A keeps moving.</td><td>green</td></tr>
-    <tr><td><code>GPIO32</code></td><td>input (ADC1_4)</td><td>BTS7960 #1 R_IS — actuator A extend current</td><td>yellow</td></tr>
-    <tr><td><code>GPIO33</code></td><td>input (ADC1_5)</td><td>BTS7960 #1 L_IS — actuator A retract current</td><td>yellow</td></tr>
-    <tr><td><code>GPIO34</code></td><td>input (ADC1_6)</td><td>BTS7960 #2 R_IS — actuator B extend current (input-only pin, OK for ADC)</td><td>yellow</td></tr>
-    <tr><td><code>GPIO35</code></td><td>input (ADC1_7)</td><td>BTS7960 #2 L_IS — actuator B retract current (input-only pin, OK for ADC)</td><td>yellow</td></tr>
+    <tr><td><code>GPIO32</code></td><td>input (ADC1_4)</td><td>BTS7960 #1 R_IS — actuator A retract current</td><td>yellow</td></tr>
+    <tr><td><code>GPIO33</code></td><td>input (ADC1_5)</td><td>BTS7960 #1 L_IS — actuator A extend current</td><td>yellow</td></tr>
+    <tr><td><code>GPIO34</code></td><td>input (ADC1_6)</td><td>BTS7960 #2 R_IS — actuator B retract current (input-only pin, OK for ADC)</td><td>yellow</td></tr>
+    <tr><td><code>GPIO35</code></td><td>input (ADC1_7)</td><td>BTS7960 #2 L_IS — actuator B extend current (input-only pin, OK for ADC)</td><td>yellow</td></tr>
     <tr><td><code>GPIO22</code></td><td>input (pull-up)</td><td>ENDSTOP B SIG (slide B side) — switch-to-GND on the Prusa MK3 board's NO contact. INPUT_PULLUP enabled in ESPHome. Endstop +Vcc must be on the 3.3 V rail (not 5 V) so the Prusa board's onboard LED/pull-up network can't drive this pin past the ESP32's 3.6 V max input.</td><td>white</td></tr>
     <tr><td><code>GPIO23</code></td><td>input (pull-up)</td><td>ENDSTOP A SIG (slide A side) — same wiring + same 3.3 V constraint as GPIO22.</td><td>white</td></tr>
     <tr><td><code>GPIO16</code></td><td>output</td><td>BC547 base (via 1 kΩ) → switches BC547 collector LOW, sinking F-1001 coil current to GND. F-1001 coil's + side is fed by SCREEN plug pin 1 from the 5 V rail. 1N4148 flyback diode lives off-board across the coil terminals.</td><td>white</td></tr>
@@ -3850,12 +3850,12 @@
     </tr>
     <tr>
       <td><strong style="color:#047857;">25</strong></td>
-      <td>BTS #1 RPWM ↔ BTS #2 RPWM ↔ ESP32 GPIO 25 <em>(extend PWM, both modules in sync)</em></td>
+      <td>BTS #1 RPWM ↔ BTS #2 RPWM ↔ ESP32 GPIO 25 <em>(retract PWM, both modules in sync)</em></td>
       <td>green</td>
     </tr>
     <tr>
       <td><strong style="color:#047857;">26</strong></td>
-      <td>BTS #1 LPWM ↔ BTS #2 LPWM ↔ ESP32 GPIO 26 <em>(retract PWM, both modules in sync)</em></td>
+      <td>BTS #1 LPWM ↔ BTS #2 LPWM ↔ ESP32 GPIO 26 <em>(extend PWM, both modules in sync)</em></td>
       <td>green</td>
     </tr>
     <tr>
@@ -3880,22 +3880,22 @@
     </tr>
     <tr>
       <td><strong style="color:#78350f;">32</strong></td>
-      <td>BTS #1 R_IS → ESP32 GPIO 32 <em>(actuator A extend current sense)</em></td>
+      <td>BTS #1 R_IS → ESP32 GPIO 32 <em>(actuator A retract current sense)</em></td>
       <td>yellow</td>
     </tr>
     <tr>
       <td><strong style="color:#78350f;">33</strong></td>
-      <td>BTS #1 L_IS → ESP32 GPIO 33 <em>(actuator A retract current sense)</em></td>
+      <td>BTS #1 L_IS → ESP32 GPIO 33 <em>(actuator A extend current sense)</em></td>
       <td>yellow</td>
     </tr>
     <tr>
       <td><strong style="color:#78350f;">34</strong></td>
-      <td>BTS #2 R_IS → ESP32 GPIO 34 <em>(actuator B extend current sense)</em></td>
+      <td>BTS #2 R_IS → ESP32 GPIO 34 <em>(actuator B retract current sense)</em></td>
       <td>yellow</td>
     </tr>
     <tr>
       <td><strong style="color:#78350f;">35</strong></td>
-      <td>BTS #2 L_IS → ESP32 GPIO 35 <em>(actuator B retract current sense)</em></td>
+      <td>BTS #2 L_IS → ESP32 GPIO 35 <em>(actuator B extend current sense)</em></td>
       <td>yellow</td>
     </tr>
     <tr>
