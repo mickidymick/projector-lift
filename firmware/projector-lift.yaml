@@ -100,13 +100,39 @@ ota:
     password: !secret ota_password
 
 # Browser UI at http://projector-lift.local/ — live sensor readouts + the
-# Diag buttons + manual reset. No auth (LAN-only assumption); flip to
-# `auth:` + credentials if exposing beyond the trusted network.
+# Diag buttons + manual reset. No auth: web_server v3's SPA silently
+# swallows button-press clicks when `auth:` is enabled (state stream
+# still works, but the JS click handler bails before dispatch). LAN-only
+# is the trust boundary for now.
 web_server:
   port: 80
   version: 3
   ota: false
   log: true
+  # v3 sorting: lower weights render first. Numbered by 10s so we can
+  # insert new entities without renumbering everything.
+  sorting_groups:
+    - id: safety_group
+      name: "!! Safety"
+      sorting_weight: 10
+    - id: primary_group
+      name: "Primary control"
+      sorting_weight: 20
+    - id: status_group
+      name: "Status"
+      sorting_weight: 30
+    - id: leveling_group
+      name: "Leveling / jogs"
+      sorting_weight: 40
+    - id: calibration_group
+      name: "Calibration"
+      sorting_weight: 50
+    - id: diag_group
+      name: "Diagnostics"
+      sorting_weight: 60
+    - id: tests_group
+      name: "Bench tests"
+      sorting_weight: 70
 
 # ===========================================================================
 # projector_lift external component — owns the OPEN / CLOSE / EMERGENCY-STOP
@@ -163,30 +189,9 @@ projector_lift:
 # ===========================================================================
 number:
   - platform: template
-    name: "Cooldown duration"
-    id: cooldown_min
-    min_value: 1
-    max_value: 60
-    step: 1
-    initial_value: 30
-    restore_value: true
-    optimistic: true
-    unit_of_measurement: min
-
-  - platform: template
-    name: "PWM ramp duration"
-    id: ramp_ms
-    min_value: 100
-    max_value: 2000
-    step: 50
-    initial_value: 500
-    restore_value: true
-    optimistic: true
-    unit_of_measurement: ms
-
-  - platform: template
     name: "Cruise duty"
     id: cruise_pct
+    icon: mdi:speedometer
     min_value: 30
     max_value: 100
     step: 5
@@ -194,65 +199,29 @@ number:
     restore_value: true
     optimistic: true
     unit_of_measurement: "%"
+    web_server:
+      sorting_group_id: calibration_group
+      sorting_weight: 10
 
   - platform: template
-    name: "Fan running duty"
-    id: fan_running_pct
-    min_value: 30
-    max_value: 100
-    step: 5
-    initial_value: 100
+    name: "PWM ramp duration"
+    id: ramp_ms
+    icon: mdi:transition
+    min_value: 100
+    max_value: 2000
+    step: 50
+    initial_value: 500
     restore_value: true
     optimistic: true
-    unit_of_measurement: "%"
-
-  - platform: template
-    name: "Fan cooldown duty"
-    id: fan_cooldown_pct
-    min_value: 20
-    max_value: 100
-    step: 5
-    initial_value: 50
-    restore_value: true
-    optimistic: true
-    unit_of_measurement: "%"
-
-  - platform: template
-    name: "End-of-travel threshold"
-    id: eot_v
-    min_value: 0.00
-    max_value: 1.50
-    step: 0.01
-    initial_value: 0.18
-    restore_value: true
-    optimistic: true
-    unit_of_measurement: V
-
-  - platform: template
-    name: "Stall threshold"
-    id: stall_v
-    min_value: 0.30
-    max_value: 3.20
-    step: 0.05
-    initial_value: 0.50
-    restore_value: true
-    optimistic: true
-    unit_of_measurement: V
-
-  - platform: template
-    name: "Screen post-close delay"
-    id: screen_delay_s
-    min_value: 0
-    max_value: 10
-    step: 0.5
-    initial_value: 3
-    restore_value: true
-    optimistic: true
-    unit_of_measurement: s
+    unit_of_measurement: ms
+    web_server:
+      sorting_group_id: calibration_group
+      sorting_weight: 20
 
   - platform: template
     name: "Travel safety timeout"
     id: travel_timeout_s
+    icon: mdi:timer-alert-outline
     min_value: 5
     max_value: 60
     step: 1
@@ -260,10 +229,104 @@ number:
     restore_value: true
     optimistic: true
     unit_of_measurement: s
+    web_server:
+      sorting_group_id: calibration_group
+      sorting_weight: 30
+
+  - platform: template
+    name: "End-of-travel threshold"
+    id: eot_v
+    icon: mdi:motion-sensor
+    min_value: 0.00
+    max_value: 1.50
+    step: 0.01
+    initial_value: 0.18
+    restore_value: true
+    optimistic: true
+    unit_of_measurement: V
+    web_server:
+      sorting_group_id: calibration_group
+      sorting_weight: 40
+
+  - platform: template
+    name: "Stall threshold"
+    id: stall_v
+    icon: mdi:alert-outline
+    min_value: 0.30
+    max_value: 3.20
+    step: 0.05
+    initial_value: 0.50
+    restore_value: true
+    optimistic: true
+    unit_of_measurement: V
+    web_server:
+      sorting_group_id: calibration_group
+      sorting_weight: 50
+
+  - platform: template
+    name: "Fan running duty"
+    id: fan_running_pct
+    icon: mdi:fan
+    min_value: 30
+    max_value: 100
+    step: 5
+    initial_value: 100
+    restore_value: true
+    optimistic: true
+    unit_of_measurement: "%"
+    web_server:
+      sorting_group_id: calibration_group
+      sorting_weight: 60
+
+  - platform: template
+    name: "Fan cooldown duty"
+    id: fan_cooldown_pct
+    icon: mdi:fan-clock
+    min_value: 20
+    max_value: 100
+    step: 5
+    initial_value: 50
+    restore_value: true
+    optimistic: true
+    unit_of_measurement: "%"
+    web_server:
+      sorting_group_id: calibration_group
+      sorting_weight: 70
+
+  - platform: template
+    name: "Screen post-close delay"
+    id: screen_delay_s
+    icon: mdi:timer-outline
+    min_value: 0
+    max_value: 10
+    step: 0.5
+    initial_value: 3
+    restore_value: true
+    optimistic: true
+    unit_of_measurement: s
+    web_server:
+      sorting_group_id: calibration_group
+      sorting_weight: 80
+
+  - platform: template
+    name: "Cooldown duration"
+    id: cooldown_min
+    icon: mdi:timer-cog-outline
+    min_value: 1
+    max_value: 60
+    step: 1
+    initial_value: 30
+    restore_value: true
+    optimistic: true
+    unit_of_measurement: min
+    web_server:
+      sorting_group_id: calibration_group
+      sorting_weight: 90
 
   - platform: template
     name: "Jog duty"
     id: jog_pct
+    icon: mdi:speedometer-slow
     min_value: 30
     max_value: 100
     step: 5
@@ -272,6 +335,9 @@ number:
     optimistic: true
     unit_of_measurement: "%"
     mode: slider
+    web_server:
+      sorting_group_id: leveling_group
+      sorting_weight: 10
 
 globals:
   # lift_state + wait_until debounce timers moved into the projector_lift C++
@@ -336,6 +402,9 @@ switch:
     name: "Screen relay"
     restore_mode: ALWAYS_OFF
     icon: mdi:projector-screen
+    web_server:
+      sorting_group_id: primary_group
+      sorting_weight: 40
 
   - platform: gpio
     pin: GPIO27
@@ -369,6 +438,9 @@ switch:
       - lambda: id(lift).request_open();
     turn_off_action:
       - lambda: id(lift).request_close();
+    web_server:
+      sorting_group_id: primary_group
+      sorting_weight: 30
 
   # ----- Per-actuator leveling jogs ---------------------------------------
   # Click ON to start moving, click OFF to stop. NO software timeout.
@@ -379,10 +451,14 @@ switch:
   # limit catches end-of-travel mechanically).
 
   - platform: template
-    name: "Level: 1 up (extend)"
+    name: "Level: actuator A up (extend)"
     id: jog_a_up
+    icon: mdi:arrow-up-bold
     optimistic: true
     restore_mode: ALWAYS_OFF
+    web_server:
+      sorting_group_id: leveling_group
+      sorting_weight: 40
     turn_on_action:
       # Mutex via publish_state — does NOT trigger the other switches'
       # turn_off_action (which would race and cut our bts/PWM mid-motion).
@@ -406,10 +482,14 @@ switch:
       - switch.turn_off: bts_a_enable
 
   - platform: template
-    name: "Level: 1 down (retract)"
+    name: "Level: actuator A down (retract)"
     id: jog_a_down
+    icon: mdi:arrow-down-bold
     optimistic: true
     restore_mode: ALWAYS_OFF
+    web_server:
+      sorting_group_id: leveling_group
+      sorting_weight: 50
     turn_on_action:
       - lambda: |-
           id(jog_a_up).publish_state(false);
@@ -431,10 +511,14 @@ switch:
       - switch.turn_off: bts_a_enable
 
   - platform: template
-    name: "Level: 2 up (extend)"
+    name: "Level: actuator B up (extend)"
     id: jog_b_up
+    icon: mdi:arrow-up-bold
     optimistic: true
     restore_mode: ALWAYS_OFF
+    web_server:
+      sorting_group_id: leveling_group
+      sorting_weight: 60
     turn_on_action:
       - lambda: |-
           id(jog_a_up).publish_state(false);
@@ -456,10 +540,14 @@ switch:
       - switch.turn_off: bts_b_enable
 
   - platform: template
-    name: "Level: 2 down (retract)"
+    name: "Level: actuator B down (retract)"
     id: jog_b_down
+    icon: mdi:arrow-down-bold
     optimistic: true
     restore_mode: ALWAYS_OFF
+    web_server:
+      sorting_group_id: leveling_group
+      sorting_weight: 70
     turn_on_action:
       - lambda: |-
           id(jog_a_up).publish_state(false);
@@ -488,8 +576,12 @@ switch:
   - platform: template
     name: "Level: both up (extend)"
     id: jog_both_up
+    icon: mdi:arrow-up-bold-box
     optimistic: true
     restore_mode: ALWAYS_OFF
+    web_server:
+      sorting_group_id: leveling_group
+      sorting_weight: 20
     turn_on_action:
       - lambda: |-
           id(jog_a_up).publish_state(false);
@@ -514,8 +606,12 @@ switch:
   - platform: template
     name: "Level: both down (retract)"
     id: jog_both_down
+    icon: mdi:arrow-down-bold-box
     optimistic: true
     restore_mode: ALWAYS_OFF
+    web_server:
+      sorting_group_id: leveling_group
+      sorting_weight: 30
     turn_on_action:
       - lambda: |-
           id(jog_a_up).publish_state(false);
@@ -548,10 +644,14 @@ binary_sensor:
       mode: INPUT_PULLUP
       inverted: true
     id: wall_button
-    name: "Wall button"
+    name: "Wall button (physical)"
+    icon: mdi:gesture-tap-button
     filters:
       - delayed_on: 30ms
       - delayed_off: 30ms
+    web_server:
+      sorting_group_id: status_group
+      sorting_weight: 20
     # Momentary rocker (Square D X-Series SQR14106WH): each press fires once;
     # release is ignored. Dispatch is endstop-driven (see on_button_press):
     # both endstops tripped ⇒ box is home ⇒ OPEN. Any endstop off ⇒ CLOSE
@@ -573,10 +673,14 @@ binary_sensor:
       mode: INPUT_PULLUP
       inverted: true
     id: endstop_a
-    name: "Endstop 1"
+    name: "Endstop A (actuator A at home)"
+    icon: mdi:home-outline
     filters:
       - delayed_on: 10ms
       - delayed_off: 10ms
+    web_server:
+      sorting_group_id: status_group
+      sorting_weight: 30
     on_press:
       then:
         - lambda: |-
@@ -592,10 +696,14 @@ binary_sensor:
       mode: INPUT_PULLUP
       inverted: true
     id: endstop_b
-    name: "Endstop 2"
+    name: "Endstop B (actuator B at home)"
+    icon: mdi:home-outline
     filters:
       - delayed_on: 10ms
       - delayed_off: 10ms
+    web_server:
+      sorting_group_id: status_group
+      sorting_weight: 40
     on_press:
       then:
         - lambda: |-
@@ -609,49 +717,69 @@ sensor:
   - platform: adc
     pin: GPIO32
     id: a_ris
-    name: "Actuator 1 R_IS"
+    name: "Actuator A retract current"
+    icon: mdi:current-dc
     update_interval: 50ms
     attenuation: 12db
     accuracy_decimals: 3
     unit_of_measurement: V
     filters:
       - sliding_window_moving_average: { window_size: 3, send_every: 1 }
+    web_server:
+      sorting_group_id: status_group
+      sorting_weight: 50
   - platform: adc
     pin: GPIO33
     id: a_lis
-    name: "Actuator 1 L_IS"
+    name: "Actuator A extend current"
+    icon: mdi:current-dc
     update_interval: 50ms
     attenuation: 12db
     accuracy_decimals: 3
     unit_of_measurement: V
     filters:
       - sliding_window_moving_average: { window_size: 3, send_every: 1 }
+    web_server:
+      sorting_group_id: status_group
+      sorting_weight: 60
   - platform: adc
     pin: GPIO34
     id: b_ris
-    name: "Actuator 2 R_IS"
+    name: "Actuator B retract current"
+    icon: mdi:current-dc
     update_interval: 50ms
     attenuation: 12db
     accuracy_decimals: 3
     unit_of_measurement: V
     filters:
       - sliding_window_moving_average: { window_size: 3, send_every: 1 }
+    web_server:
+      sorting_group_id: status_group
+      sorting_weight: 70
   - platform: adc
     pin: GPIO35
     id: b_lis
-    name: "Actuator 2 L_IS"
+    name: "Actuator B extend current"
+    icon: mdi:current-dc
     update_interval: 50ms
     attenuation: 12db
     accuracy_decimals: 3
     unit_of_measurement: V
     filters:
       - sliding_window_moving_average: { window_size: 3, send_every: 1 }
+    web_server:
+      sorting_group_id: status_group
+      sorting_weight: 80
 
 text_sensor:
   - platform: template
     name: "Lift state"
     id: lift_state_str
+    icon: mdi:elevator
     update_interval: 1s
+    web_server:
+      sorting_group_id: status_group
+      sorting_weight: 10
     lambda: |-
       // Derived from physical endstops, NOT the internal state machine —
       // so it reflects current physical reality across reboots / faults.
@@ -667,7 +795,11 @@ text_sensor:
   - platform: template
     name: "AVR monitor mode"
     id: avr_monitor_str
+    icon: mdi:hdmi-port
     update_interval: 5s
+    web_server:
+      sorting_group_id: status_group
+      sorting_weight: 90
     lambda: |-
       switch (id(avr_monitor_state)) {
         case 1: return {"MONI1"};
@@ -686,6 +818,10 @@ cover:
     device_class: shutter
     optimistic: true
     assumed_state: true
+    icon: mdi:elevator
+    web_server:
+      sorting_group_id: primary_group
+      sorting_weight: 20
     open_action:
       - lambda: id(lift).request_open();
     close_action:
@@ -1054,6 +1190,7 @@ button:
   # "Diag: reset to CLOSED" once the box is in a known-safe position.
   - platform: template
     name: "!! STOP — kill all motion"
+    icon: mdi:alert-octagon
     on_press:
       # Stop endstop-test scripts first (they live in YAML, C++ can't reach
       # them). emergency_stop() cancels scheduled callbacks + kills PWM/BTS
@@ -1061,15 +1198,41 @@ button:
       - script.stop: test_endstop_a_cycle
       - script.stop: test_endstop_b_cycle
       - lambda: id(lift).emergency_stop();
+    web_server:
+      sorting_group_id: safety_group
+      sorting_weight: 10
 
   # Hardware-grade backstop: full ESP32 reboot. Use if STOP doesn't behave
   # (firmware wedge / scheduler stuck). All GPIOs return to power-on
   # defaults — BTS EN drops, PWM stops, motors coast. ~5 s downtime.
   - platform: restart
     name: "!! Reboot ESP32"
+    icon: mdi:restart-alert
+    web_server:
+      sorting_group_id: safety_group
+      sorting_weight: 20
+
+  - platform: template
+    name: "Wall button (virtual)"
+    icon: mdi:gesture-tap-button
+    on_press:
+      - lambda: id(lift).on_button_press();
+    web_server:
+      sorting_group_id: primary_group
+      sorting_weight: 10
+
+  - platform: template
+    name: "Diag: reset to CLOSED"
+    icon: mdi:restore
+    on_press:
+      - lambda: id(lift).force_closed();
+    web_server:
+      sorting_group_id: diag_group
+      sorting_weight: 10
 
   - platform: template
     name: "Diag: jog extend 500ms"
+    icon: mdi:arrow-up-bold-outline
     on_press:
       - light.turn_off: { id: rpwm, transition_length: 0s }
       - delay: 50ms
@@ -1081,9 +1244,13 @@ button:
       - delay: 100ms
       - switch.turn_off: bts_a_enable
       - switch.turn_off: bts_b_enable
+    web_server:
+      sorting_group_id: diag_group
+      sorting_weight: 20
 
   - platform: template
     name: "Diag: jog retract 500ms"
+    icon: mdi:arrow-down-bold-outline
     on_press:
       - light.turn_off: { id: lpwm, transition_length: 0s }
       - delay: 50ms
@@ -1095,37 +1262,50 @@ button:
       - delay: 100ms
       - switch.turn_off: bts_a_enable
       - switch.turn_off: bts_b_enable
-
-  - platform: template
-    name: "Wall button (virtual)"
-    on_press:
-      - lambda: id(lift).on_button_press();
-
-  - platform: template
-    name: "Diag: reset to CLOSED"
-    on_press:
-      - lambda: id(lift).force_closed();
+    web_server:
+      sorting_group_id: diag_group
+      sorting_weight: 30
 
   - platform: template
     name: "Diag: AVR → INDOOR"
+    icon: mdi:television
     on_press:
       - script.execute: avr_indoor
+    web_server:
+      sorting_group_id: diag_group
+      sorting_weight: 40
   - platform: template
     name: "Diag: AVR → OUTDOOR"
+    icon: mdi:projector
     on_press:
       - script.execute: avr_outdoor
+    web_server:
+      sorting_group_id: diag_group
+      sorting_weight: 50
   - platform: template
     name: "Diag: AVR → BOTH"
+    icon: mdi:audio-video
     on_press:
       - script.execute: avr_both
+    web_server:
+      sorting_group_id: diag_group
+      sorting_weight: 60
   - platform: template
     name: "Diag: Projector POWR 1"
+    icon: mdi:projector
     on_press:
       - script.execute: projector_power_on
+    web_server:
+      sorting_group_id: diag_group
+      sorting_weight: 70
   - platform: template
     name: "Diag: Projector POWR 0"
+    icon: mdi:projector-off
     on_press:
       - script.execute: projector_power_off
+    web_server:
+      sorting_group_id: diag_group
+      sorting_weight: 80
 
   # ----- TEMPORARY: endstop relocation bench test --------------------------
   # Added 2026-06-30 to validate endstop A after relocation to actuator 1.
@@ -1133,11 +1313,19 @@ button:
   # script.stop. Remove this button + its script after the relocated
   # endstops + IS-pin pulldown mod are both validated.
   - platform: template
-    name: "Test: endstop 1 trip cycle (3x)"
+    name: "Test: endstop A trip cycle (3x)"
+    icon: mdi:flask-outline
     on_press:
       - script.execute: test_endstop_a_cycle
+    web_server:
+      sorting_group_id: tests_group
+      sorting_weight: 10
 
   - platform: template
-    name: "Test: endstop 2 trip cycle (3x)"
+    name: "Test: endstop B trip cycle (3x)"
+    icon: mdi:flask-outline
     on_press:
       - script.execute: test_endstop_b_cycle
+    web_server:
+      sorting_group_id: tests_group
+      sorting_weight: 20

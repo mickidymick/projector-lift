@@ -2,3 +2,4 @@ firmware/secrets.yaml
 firmware/.esphome/
 firmware/.platformio/
 firmware/build/
+firmware/components/**/__pycache__/

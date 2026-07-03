@@ -49,17 +49,30 @@ esphome run projector-lift.yaml --device /dev/ttyUSB0
 ```bash
 docker run --rm -it \
   --user $(id -u):$(id -g) \
+  -e HOME=/config \
   -v "$PWD":/config -w /config \
   --device=/dev/ttyUSB0 \
   ghcr.io/esphome/esphome:latest run projector-lift.yaml --device /dev/ttyUSB0
 ```
 
-After the first wired flash, subsequent updates can go over WiFi — same
-command, drop the `--device` flag:
+`HOME=/config` gives platformio a writable home for `.platformio/` — without
+it, the compile aborts on `PermissionError: '/.platformio'` because uid 1000
+has no home in the container.
+
+After the first wired flash, subsequent updates can go over WiFi. mDNS does
+not resolve inside the container, so pass `--device <IP>` explicitly:
 
 ```bash
-esphome run projector-lift.yaml      # auto-discovers via mDNS
+docker run --rm --user $(id -u):$(id -g) -e HOME=/config \
+  -v "$PWD":/config -w /config \
+  ghcr.io/esphome/esphome:latest upload projector-lift.yaml --device 10.0.0.175
 ```
+
+**Do not add `auth:` to `web_server:`** — ESPHome web_server v3 (2026.6.3)
+silently disables the SPA's button-click dispatch when auth is enabled. The
+state stream keeps working so the failure is invisible until you try to
+press a button. LAN-only is the trust boundary; use a reverse proxy if you
+need auth.
 
 ## Bench bring-up sequence
 
