@@ -178,12 +178,19 @@ during FAULT is ignored (run the Diag reset instead).
 The firmware opens TCP connections to the AVR and projector on lift state
 changes:
 
-- **Denon AVR-X2800H** (`${avr_ip}:23`) — VSMONI / MU / Z2 commands per §12
-  - OPENING fires `VSMONI2 / MUON / Z2SOURCE / Z2ON`
-  - CLOSING fires `VSMONI1 / MUOFF / Z2OFF`
-  - `avr_both` script fires `VSMONIAUTO / MUOFF / Z2SOURCE / Z2ON` — callable
-    from a HA automation when the Sony TV is woken with its own remote
-    during OUTDOOR mode
+- **Denon AVR-X2800H** (`${avr_ip}:23`) — VSMONI / PSFRONT / MS commands
+  - **AVR setup prerequisite**: Amp Assign = "5.1ch + Front B". Indoor 5.1
+    on Front A terminals; porch stereo pair on Front B terminals. Zone 2 is
+    not used by this firmware — the topology change makes Apple TV HDMI-CEC
+    volume Just Work everywhere, because CEC targets Main volume and Main
+    drives whichever Front pair is active.
+  - OPENING fires `VSMONI2 / PSFRONT SPB / MSSTEREO / MUOFF` (projector +
+    porch speakers; stereo mode so Center/Surround don't bleed indoors)
+  - CLOSING fires `VSMONI1 / PSFRONT SPA / MSMOVIE / MUOFF` (TV + indoor
+    speakers; movie mode restores surround decode)
+  - `avr_both` script fires `VSMONIAUTO / PSFRONT A+B / MSSTEREO / MUOFF` —
+    same source everywhere; useful when parents want listening in both
+    zones during a manual override
   - Polled every 5 s while OPEN — exposes `AVR monitor mode` text sensor
 - **Epson PowerLite L730U** (`${projector_ip}:4352`) — PJLink Class 1
   - OPENING fires `%1POWR 1` (before the actuators move)

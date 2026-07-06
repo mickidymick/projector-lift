@@ -94,6 +94,10 @@ captive_portal:
 api:
   encryption:
     key: !secret api_key
+  # No HA client at dad's site — default 15-min watchdog was rebooting the
+  # ESP32 every 15 min, which called force_closed() and retracted the screen
+  # mid-movie. Disable it; HA at your site still connects fine when reachable.
+  reboot_timeout: 0s
 
 ota:
   - platform: esphome
@@ -878,51 +882,62 @@ script:
   # CR-terminated. Each script opens a fresh TCP connection so a network blip
   # doesn't leave a stale socket pinned to the AVR. Sockets are POSIX/lwip
   # via the helpers in includes.h — works in both Arduino and ESP-IDF builds.
+  #
+  # TOPOLOGY (2026-07-05 rearchitecture): everything runs on Main zone. Zone 2
+  # is not used. Amp Assign in AVR Setup must be "5.1ch + Front B". Speaker
+  # wiring: indoor 5.1 pair on Front A terminals, porch stereo pair on Front B.
+  # Mode switching is Main-zone Front A/B via PSFRONT, not Zone 2 power. This
+  # makes Apple TV HDMI-CEC volume Just Work — CEC targets Main volume, which
+  # drives whichever Front pair is currently active.
+  #
+  # Sound mode is forced to STEREO when Front B is active so Center / Surround
+  # / Sub channels don't bleed to their (indoor) speakers while porch plays.
+  # On return to indoor we set MOVIE so surround decode resumes for the TV.
   # ===========================================================================
   - id: avr_indoor
     then:
       - lambda: |-
-          int s = tcp_connect("${avr_ip}", 23, 500);
-          if (s < 0) {
-            ESP_LOGW("avr", "indoor: connect fail");
-            return;
-          }
-          const char *cmd = "VSMONI1\rMUOFF\rZ2OFF\r";
-          tcp_send(s, cmd, strlen(cmd));
+          int s = tcp_connect_retry("avr.indoor", "${avr_ip}", 23, 500, 1);
+          if (s < 0) return;
+          static const char *cmds[] = {"VSMONI1\r",     "PSFRONT SPA\r", "MSMOVIE\r", "MUOFF\r"};
+          static const char *toks[] = {"VSMONI1",       "PSFRONT SPA",   "MSMOVIE",   "MUOFF"};
+          tcp_send_and_verify("avr.indoor", s, cmds, toks, 4);
           ::close(s);
-          ESP_LOGI("avr", "→ INDOOR (VSMONI1 / MUOFF / Z2OFF)");
 
   - id: avr_outdoor
     then:
       - lambda: |-
-          int s = tcp_connect("${avr_ip}", 23, 500);
-          if (s < 0) {
-            ESP_LOGW("avr", "outdoor: connect fail");
-            return;
-          }
-          const char *cmd = "VSMONI2\rMUON\rZ2SOURCE\rZ2ON\r";
-          tcp_send(s, cmd, strlen(cmd));
+          int s = tcp_connect_retry("avr.outdoor", "${avr_ip}", 23, 500, 1);
+          if (s < 0) return;
+          static const char *cmds[] = {"VSMONI2\r",     "PSFRONT SPB\r", "MSSTEREO\r", "MUOFF\r"};
+          static const char *toks[] = {"VSMONI2",       "PSFRONT SPB",   "MSSTEREO",   "MUOFF"};
+          tcp_send_and_verify("avr.outdoor", s, cmds, toks, 4);
           ::close(s);
-          ESP_LOGI("avr", "→ OUTDOOR (VSMONI2 / MUON / Z2SOURCE / Z2ON)");
 
+  # avr_both = same source everywhere (Front A + Front B driven together). Kept
+  # around for manual "listening across the house" cases; not fired by the state
+  # machine. Sound mode stays STEREO because Front B is a 2-ch pair.
   - id: avr_both
     then:
       - lambda: |-
-          int s = tcp_connect("${avr_ip}", 23, 500);
-          if (s < 0) {
-            ESP_LOGW("avr", "both: connect fail");
-            return;
-          }
-          const char *cmd = "VSMONIAUTO\rMUOFF\rZ2SOURCE\rZ2ON\r";
-          tcp_send(s, cmd, strlen(cmd));
+          int s = tcp_connect_retry("avr.both", "${avr_ip}", 23, 500, 1);
+          if (s < 0) return;
+          static const char *cmds[] = {"VSMONIAUTO\r",  "PSFRONT A+B\r", "MSSTEREO\r", "MUOFF\r"};
+          static const char *toks[] = {"VSMONIAUTO",    "PSFRONT A+B",   "MSSTEREO",   "MUOFF"};
+          tcp_send_and_verify("avr.both", s, cmds, toks, 4);
           ::close(s);
-          ESP_LOGI("avr", "→ BOTH (VSMONIAUTO / MUOFF / Z2SOURCE / Z2ON)");
 
   - id: avr_query_monitor
     then:
       - lambda: |-
-          int s = tcp_connect("${avr_ip}", 23, 300);
-          if (s < 0) return;
+          int err = 0;
+          int s = tcp_connect("${avr_ip}", 23, 300, &err);
+          if (s < 0) {
+            // Poll runs every 5s while OPEN — log at DEBUG so we don't flood
+            // WARN, but still leave a trail if the AVR goes unreachable.
+            ESP_LOGD("avr", "query connect fail (errno=%d %s)", err, strerror(err));
+            return;
+          }
           // Denon "VS" family uses a space before `?` for queries. If the
           // AVR returns nothing on first test, try "VSMONI?" without the
           // space — some firmware revisions accept either form.
@@ -947,48 +962,59 @@ script:
   - id: projector_power_on
     then:
       - lambda: |-
-          int s = tcp_connect("${projector_ip}", 4352, 500);
-          if (s < 0) {
-            ESP_LOGW("pjlink", "power_on: connect fail");
-            return;
-          }
+          int s = tcp_connect_retry("pjlink.on", "${projector_ip}", 4352, 500, 1);
+          if (s < 0) return;
           std::string greet;
           tcp_read_until_cr(s, greet, 500);
           if (greet.find("PJLINK 0") == std::string::npos) {
-            ESP_LOGW("pjlink", "no PJLINK 0 greeting (auth on?): %s", greet.c_str());
+            ESP_LOGW("pjlink", "on: no PJLINK 0 greeting (auth on?): %s", greet.c_str());
             ::close(s);
             return;
           }
           const char *cmd = "%1POWR 1\r";
           tcp_send(s, cmd, strlen(cmd));
+          // Read the POWR reply so we notice ERR3 (warming/cooling) etc.
+          std::string reply;
+          tcp_read_until_cr(s, reply, 500);
           ::close(s);
-          ESP_LOGI("pjlink", "→ POWR 1");
+          if (reply.find("POWR=OK") != std::string::npos) {
+            ESP_LOGI("pjlink", "→ POWR 1 OK");
+          } else {
+            ESP_LOGW("pjlink", "→ POWR 1 non-OK reply: %s", reply.c_str());
+          }
 
   - id: projector_power_off
     then:
       - lambda: |-
-          int s = tcp_connect("${projector_ip}", 4352, 500);
-          if (s < 0) {
-            ESP_LOGW("pjlink", "power_off: connect fail");
-            return;
-          }
+          int s = tcp_connect_retry("pjlink.off", "${projector_ip}", 4352, 500, 1);
+          if (s < 0) return;
           std::string greet;
           tcp_read_until_cr(s, greet, 500);
           if (greet.find("PJLINK 0") == std::string::npos) {
-            ESP_LOGW("pjlink", "no PJLINK 0 greeting (auth on?): %s", greet.c_str());
+            ESP_LOGW("pjlink", "off: no PJLINK 0 greeting (auth on?): %s", greet.c_str());
             ::close(s);
             return;
           }
           const char *cmd = "%1POWR 0\r";
           tcp_send(s, cmd, strlen(cmd));
+          std::string reply;
+          tcp_read_until_cr(s, reply, 500);
           ::close(s);
-          ESP_LOGI("pjlink", "→ POWR 0");
+          if (reply.find("POWR=OK") != std::string::npos) {
+            ESP_LOGI("pjlink", "→ POWR 0 OK");
+          } else {
+            ESP_LOGW("pjlink", "→ POWR 0 non-OK reply: %s", reply.c_str());
+          }
 
   - id: projector_query_state
     then:
       - lambda: |-
-          int s = tcp_connect("${projector_ip}", 4352, 500);
-          if (s < 0) return;
+          int err = 0;
+          int s = tcp_connect("${projector_ip}", 4352, 500, &err);
+          if (s < 0) {
+            ESP_LOGD("pjlink", "query connect fail (errno=%d %s)", err, strerror(err));
+            return;
+          }
           std::string greet;
           tcp_read_until_cr(s, greet, 500);
           if (greet.find("PJLINK 0") == std::string::npos) {

@@ -12,6 +12,7 @@
 
 #include "esphome/core/log.h"
 #include "esphome/core/hal.h"          // millis()
+#include "esp_system.h"                // esp_reset_reason()
 
 namespace esphome {
 namespace projector_lift {
@@ -34,11 +35,36 @@ static const char *state_name_(State s) {
   return "?";
 }
 
+// Decode esp_reset_reason() so boot logs make the reboot cause obvious.
+// POWERON / EXT are expected (cold boot, external reset); PANIC / TASK_WDT /
+// INT_WDT / BROWNOUT are the ones worth chasing if they show up mid-session.
+static const char *reset_reason_str_(esp_reset_reason_t r) {
+  switch (r) {
+    case ESP_RST_POWERON:   return "POWERON";
+    case ESP_RST_EXT:       return "EXT";
+    case ESP_RST_SW:        return "SW";
+    case ESP_RST_PANIC:     return "PANIC";
+    case ESP_RST_INT_WDT:   return "INT_WDT";
+    case ESP_RST_TASK_WDT:  return "TASK_WDT";
+    case ESP_RST_WDT:       return "WDT";
+    case ESP_RST_DEEPSLEEP: return "DEEPSLEEP";
+    case ESP_RST_BROWNOUT:  return "BROWNOUT";
+    case ESP_RST_SDIO:      return "SDIO";
+    default:                return "UNKNOWN";
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Component lifecycle.
 // ---------------------------------------------------------------------------
 
 void ProjectorLift::setup() {
+  // Log why we booted. A pattern of PANIC / BROWNOUT / TASK_WDT here across
+  // multiple boots is the diagnostic hook for chasing the mid-session screen
+  // drop bug — the reconcile fix restores outputs, but the underlying reboot
+  // cause still needs finding.
+  ESP_LOGI(TAG, "boot: reset_reason=%s", reset_reason_str_(esp_reset_reason()));
+
   // Pull every motion output to a known-safe state before WiFi is up — same
   // as the old on_boot priority=-100 `enter_closed` script.
   kill_motion_();
@@ -358,10 +384,36 @@ void ProjectorLift::reconcile_from_endstops() {
     fire_(on_boot_closed_);
   } else if (!a && !b) {
     set_state_(State::OPEN, "boot reconcile: neither endstop tripped");
+    // Box was physically OPEN before this boot — projector is presumably still
+    // running. setup() (and screen_relay's ALWAYS_OFF restore) zeroed the
+    // screen relay + fan; restore them so a mid-session reboot doesn't
+    // silently drop the screen or stop cooling while state reads OPEN.
+    screen_->turn_on();
+    {
+      auto call = fan_->turn_on();
+      call.set_brightness(fan_running_pct_->state / 100.0f);
+      call.set_transition_length(200);
+      call.perform();
+    }
     fire_(on_boot_open_);
   } else {
-    ESP_LOGW(TAG, "boot reconcile: endstops asymmetric (a=%d b=%d)", a, b);
-    set_state_(State::FAULT, "boot reconcile: asymmetric endstops");
+    // Asymmetric endstops = mid-motion power loss or one endstop stuck. Prior
+    // behavior FAULTed here, which locks out the wall button — parents don't
+    // know about the Diag reset. Safer default: treat as OPEN. Wall-button
+    // dispatch (see on_button_press) reads endstop state directly and will
+    // drive a close on the next press since not both are tripped. Restore
+    // outputs so the projector cooling + screen stay coherent with state.
+    ESP_LOGW(TAG, "boot reconcile: endstops asymmetric (a=%d b=%d) — treating as OPEN; wall button will retract",
+             a, b);
+    set_state_(State::OPEN, "boot reconcile: asymmetric endstops");
+    screen_->turn_on();
+    {
+      auto call = fan_->turn_on();
+      call.set_brightness(fan_running_pct_->state / 100.0f);
+      call.set_transition_length(200);
+      call.perform();
+    }
+    fire_(on_boot_open_);
   }
   fire_(on_boot_reconciled_);
 }
