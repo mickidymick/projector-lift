@@ -3371,12 +3371,13 @@
                                     GND(238,242) L_IS(266,242) L_EN(294,242) LPWM(322,242)
   -->
 
-  <!-- ============ (LM2596 #1 moved to future 12 V board 2026-06-23) ============ -->
-  <!-- The 12 V → 5 V buck now lives upstream of Plug 1's 5 V IN. Footprint now holds     -->
-  <!-- the IS-pin mod annotation (2026-07-05): 4× 1 kΩ + 4× 100 nF live on the BACK of    -->
-  <!-- the board, one R∥C pair from each IS pad → GND rail. The callout below is the      -->
-  <!-- schematic; the "•B" dots at each IS pin tag mark the back-side pair locations.     -->
-  <g transform="translate(380, 245)">
+  <!-- ============ IS-pin mod annotation (2026-07-05) ============ -->
+  <!-- 4× 1 kΩ + 4× 100 nF live on the BACK of the board, one R∥C pair from each IS pad -->
+  <!-- → GND rail. This callout is the schematic; the dashed "B" circles at each IS pin -->
+  <!-- tag on the BTS sockets mark the back-side pair locations. Positioned above the   -->
+  <!-- endstop/BC547 stack (was overlapping the endstops when placed in the empty       -->
+  <!-- LM2596 footprint at y=245).                                                       -->
+  <g transform="translate(440, 90)">
     <rect x="0" y="0" width="130" height="80" rx="4" fill="#faf5ff" stroke="#7c3aed" stroke-width="1.2" stroke-dasharray="4 3"/>
     <text x="65" y="14" text-anchor="middle" font-size="10" font-weight="700" fill="#5b21b6">IS-pin mod (back, ×4)</text>
     <!-- schematic: node (IS pin) → R ∥ C → GND -->
