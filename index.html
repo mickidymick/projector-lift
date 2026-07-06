@@ -1115,7 +1115,7 @@
       </div>
       <div class="info">
         <div class="name">Chanzon double-sided perfboard kit <span style="color:var(--muted);font-weight:400;font-size:12px">(34 boards, 5 sizes incl. 5×7 and 7×9 cm)</span></div>
-        <div class="desc">The substrate for all four through-hole boards in this build. 2.54 mm hole pitch + plated through-holes on both sides. <strong>One 7×9 cm board</strong> for the main control board (ESP32 + 2× BTS7960 sockets + BC547 + 1 kΩ + 2× endstop headers + 4× Phoenix plugs). <strong>Three 5×7 cm boards</strong> for the three small boards: the fan-driver perfboard (IRLZ44N + gate network + flyback + 3 plugs), the 12 V power board (3 A fuse + 4 plugs — see Diagram #5), and the motor fuse board (2× 5 A fuses + 1000 µF bulk cap + P6KE15CA TVS + 3 plugs — see Diagram #6). ~30 spares for future projects.</div>
+        <div class="desc">The substrate for all four through-hole boards in this build. 2.54 mm hole pitch + plated through-holes on both sides. <strong>One 7×9 cm board</strong> for the main control board (ESP32 + 2× BTS7960 sockets + BC547 + 1 kΩ + 2× endstop headers + 4× Phoenix plugs + <strong>4× 1 kΩ + 4× 100 nF on the back for the IS-pin pulldown/filter mod</strong>). <strong>Three 5×7 cm boards</strong> for the three small boards: the fan-driver perfboard (IRLZ44N + gate network + flyback + 3 plugs), the 12 V power board (3 A fuse + 4 plugs — see Diagram #5), and the motor fuse board (2× 5 A fuses + 1000 µF bulk cap + P6KE15CA TVS + 3 plugs — see Diagram #6). ~30 spares for future projects.</div>
       </div>
       <div class="side">
         <div class="price-line">$8.99</div>
@@ -2502,14 +2502,14 @@
     <li><strong>Never use blocking <code>delay()</code></strong> in <code>loop()</code>. Drive the state machine with <code>millis()</code> deltas so the button is read every iteration.</li>
     <li><strong>Mark all ISR-shared variables <code>volatile</code></strong> — don't let the compiler optimize away updates from interrupt context.</li>
     <li><strong>Enforce BTS7960 deadtime</strong> (~50 ms minimum between direction reversals) — a shoot-through pulse generates EMI identical to half-suppressed kickback.</li>
-    <li><strong>End-of-travel threshold calibrated to the actuators</strong>: read normal running current first, set the "end-of-travel" threshold somewhere comfortably above the noise floor but below the lowest "running" reading you ever see (0.1–0.3 V is the usual band on R_IS / L_IS). Until the IS-pin pulldown mod (next card) is installed, the high end of the IS range saturates the ADC at the on-module 10 kΩ pulldown — that's fine; current-drop detection only needs the low end, which reads cleanly. Tune empirically with the real PA-04s on the bench.</li>
-    <li><strong>Stall detection re-enable plan:</strong> see the next card (<em>IS-pin pulldown + filter mod</em>). Mod installs 4× 1 kΩ + 4× 100 nF to rescale IS-pin voltage into the ESP32 ADC window so running / stall / EOT bands become discriminable instead of all saturating at the rail. Until then the firmware uses only the current-drop EOT signal (PA-04 internal-limit fires → IS-pin voltage collapses to ~0) plus the <code>Travel safety timeout</code> as the failsafe.</li>
+    <li><strong>End-of-travel threshold calibrated to the actuators</strong>: read normal running current first, set the "end-of-travel" threshold somewhere comfortably above the noise floor but below the lowest "running" reading you ever see. With the IS-pin mod installed (2026-07-05, see next card), the full 0–3.3 V ADC window is now usable — expected cruise range ~0.4–1.3 V, EOT signal stays near 0 V, stall lives above ~1.5 V. Tune <code>eot_v</code> empirically with the real PA-04s on the bench.</li>
+    <li><strong>Stall detection re-enable plan:</strong> the mod is installed (next card, 2026-07-05). Firmware stall path is coded in <code>ProjectorLift::check_motion_()</code> using <code>stall_v</code> (HA number entity, default 0.50 V — bump to ~1.5 V once bench-calibrated). Bench-calibrate first (measure cruise IS voltage across a full stroke), then set <code>stall_v</code> ~30 % below observed stall reading, then run a controlled obstruction test at low duty before trusting it at cruise duty.</li>
   </ul>
 </div>
 
 <div class="card">
-  <span class="label">IS-pin pulldown + filter mod (current-sensing rescale)</span>
-  <p class="why">The BTS7960 module's on-board 10 kΩ pulldown on each IS pin is sized for the chip's max ~43 A rating. At our actual ~4–12 A operating range the IS pin saturates the ESP32's 3.3 V ADC any time the motor is drawing meaningful current — so "running", "stall", and "EOT" all look identical (≈ rail). Drop a 1 kΩ to GND in parallel with the on-module 10 kΩ and the effective pulldown becomes ~909 Ω; current scales linearly into the 0–3.3 V ADC window so the three bands become individually readable. A 100 nF cap in parallel filters the PWM commutation transients (τ ≈ 90 µs at 20 kHz PWM — passes the motor's slow load envelope, blocks the per-period kick).</p>
+  <span class="label">IS-pin pulldown + filter mod (current-sensing rescale) — <span style="color:#047857;">installed 2026-07-05</span></span>
+  <p class="why">The BTS7960 module's on-board 10 kΩ pulldown on each IS pin is sized for the chip's max ~43 A rating. At our actual ~4–12 A operating range the IS pin saturates the ESP32's 3.3 V ADC any time the motor is drawing meaningful current — so "running", "stall", and "EOT" all look identical (≈ rail). Drop a 1 kΩ to GND in parallel with the on-module 10 kΩ and the effective pulldown becomes ~909 Ω; current scales linearly into the 0–3.3 V ADC window so the three bands become individually readable. A 100 nF cap in parallel filters the PWM commutation transients (τ ≈ 90 µs at 20 kHz PWM — passes the motor's slow load envelope, blocks the per-period kick). <strong>Physically installed 2026-07-05</strong> on the back of the main perfboard — see the perfboard layout diagram in §9 for the four back-side R∥C positions marked "B".</p>
   <ul>
     <li><strong>BOM (already on-hand 2026-06-30 from BOJACK + ALLECIN kits):</strong> 4× 1 kΩ axial ¼ W carbon-film resistor (one per IS pin), 4× 100 nF / 50 V ceramic disc cap (one per IS pin).</li>
     <li><strong>Per-channel wiring</strong> — one R and one C from each IS pin to logic GND. All 4 channels (GPIO 32 / 33 / 34 / 35) get the identical treatment. The on-module 10 kΩ stays in place — we're adding in parallel, not replacing.</li>
@@ -2993,37 +2993,37 @@
   <!-- BTS7960 #2 R_IS → GPIO34 -->
   <rect class="dest dest-adc" x="40" y="188" width="320" height="24" rx="5"/>
   <text class="dest-lbl" x="52" y="205">BTS7960 #2 · R_IS</text>
-  <text class="dest-sub" x="240" y="205">actuator B extend current</text>
+  <text class="dest-sub" x="240" y="205">actuator B retract current</text>
   <path class="wc-yel" d="M 360 200 L 400 200"/>
 
   <!-- BTS7960 #2 L_IS → GPIO35 -->
   <rect class="dest dest-adc" x="40" y="218" width="320" height="24" rx="5"/>
   <text class="dest-lbl" x="52" y="235">BTS7960 #2 · L_IS</text>
-  <text class="dest-sub" x="240" y="235">actuator B retract current</text>
+  <text class="dest-sub" x="240" y="235">actuator B extend current</text>
   <path class="wc-yel" d="M 360 230 L 400 230"/>
 
   <!-- BTS7960 #1 R_IS → GPIO32 -->
   <rect class="dest dest-adc" x="40" y="248" width="320" height="24" rx="5"/>
   <text class="dest-lbl" x="52" y="265">BTS7960 #1 · R_IS</text>
-  <text class="dest-sub" x="240" y="265">actuator A extend current</text>
+  <text class="dest-sub" x="240" y="265">actuator A retract current</text>
   <path class="wc-yel" d="M 360 260 L 400 260"/>
 
   <!-- BTS7960 #1 L_IS → GPIO33 -->
   <rect class="dest dest-adc" x="40" y="278" width="320" height="24" rx="5"/>
   <text class="dest-lbl" x="52" y="295">BTS7960 #1 · L_IS</text>
-  <text class="dest-sub" x="240" y="295">actuator A retract current</text>
+  <text class="dest-sub" x="240" y="295">actuator A extend current</text>
   <path class="wc-yel" d="M 360 290 L 400 290"/>
 
   <!-- RPWM (both modules in parallel) → GPIO25 -->
   <rect class="dest dest-sig" x="40" y="308" width="320" height="24" rx="5"/>
   <text class="dest-lbl" x="52" y="325">BTS7960 #1 + #2 · RPWM</text>
-  <text class="dest-sub" x="240" y="325">extend PWM (LEDC ch 0, 20 kHz)</text>
+  <text class="dest-sub" x="240" y="325">retract PWM (LEDC ch 0, 20 kHz)</text>
   <path class="wc-grn" d="M 360 320 L 400 320"/>
 
   <!-- LPWM (both modules in parallel) → GPIO26 -->
   <rect class="dest dest-sig" x="40" y="338" width="320" height="24" rx="5"/>
   <text class="dest-lbl" x="52" y="355">BTS7960 #1 + #2 · LPWM</text>
-  <text class="dest-sub" x="240" y="355">retract PWM (LEDC ch 1, 20 kHz)</text>
+  <text class="dest-sub" x="240" y="355">extend PWM (LEDC ch 1, 20 kHz)</text>
   <path class="wc-grn" d="M 360 350 L 400 350"/>
 
   <!-- R_EN + L_EN, BTS7960 #1 only (split from #2 for independent endstop cutoff) → GPIO27 -->
@@ -3129,14 +3129,14 @@
     <tr><td><code>5V / VIN</code></td><td>power in</td><td>5 V rail from Plug 1 pin 2 — feeds onboard AMS1117 (internal 3.3 V), also taps to both BTS7960 VCC pins and to SCREEN plug pin 1 (F-1001 coil + supply). USB and external supply can coexist on this pin via the dev board's power-mux MOSFET, so you can leave USB plugged in for programming.</td><td>blue</td></tr>
     <tr><td><code>3V3</code></td><td>power out</td><td>AMS1117 output, tapped to source the on-board 3.3 V rail that feeds endstop +Vcc on both Prusa headers. <em>Output only — never drive external 3.3 V back into this pin.</em></td><td>orange</td></tr>
     <tr><td><code>GND</code> (×2)</td><td>power in</td><td>logic-side ground · star-tied at PSU output</td><td>black</td></tr>
-    <tr><td><code>GPIO25</code></td><td>output (PWM)</td><td>RPWM (extend) — tied to <em>both</em> BTS7960 RPWM pins in parallel · LEDC ch 0, 20 kHz</td><td>green</td></tr>
-    <tr><td><code>GPIO26</code></td><td>output (PWM)</td><td>LPWM (retract) — tied to <em>both</em> BTS7960 LPWM pins in parallel · LEDC ch 1, 20 kHz</td><td>green</td></tr>
+    <tr><td><code>GPIO25</code></td><td>output (PWM)</td><td>RPWM (retract) — tied to <em>both</em> BTS7960 RPWM pins in parallel · LEDC ch 0, 20 kHz</td><td>green</td></tr>
+    <tr><td><code>GPIO26</code></td><td>output (PWM)</td><td>LPWM (extend) — tied to <em>both</em> BTS7960 LPWM pins in parallel · LEDC ch 1, 20 kHz</td><td>green</td></tr>
     <tr><td><code>GPIO27</code></td><td>output</td><td>BTS7960 <em>#1</em> R_EN + L_EN <em>only</em> — independent enable for actuator A. Firmware drops this LOW on endstop A trip → BTS #1 outputs go hi-Z, actuator A stops while actuator B keeps moving. (Was ganged to both BTS modules pre-2026-06-23; split to give per-actuator endstop cutoff.)</td><td>green</td></tr>
     <tr><td><code>GPIO19</code></td><td>output</td><td>BTS7960 <em>#2</em> R_EN + L_EN <em>only</em> — independent enable for actuator B. Firmware drops this LOW on endstop B trip → BTS #2 outputs go hi-Z, actuator B stops while actuator A keeps moving.</td><td>green</td></tr>
-    <tr><td><code>GPIO32</code></td><td>input (ADC1_4)</td><td>BTS7960 #1 R_IS — actuator A extend current</td><td>yellow</td></tr>
-    <tr><td><code>GPIO33</code></td><td>input (ADC1_5)</td><td>BTS7960 #1 L_IS — actuator A retract current</td><td>yellow</td></tr>
-    <tr><td><code>GPIO34</code></td><td>input (ADC1_6)</td><td>BTS7960 #2 R_IS — actuator B extend current (input-only pin, OK for ADC)</td><td>yellow</td></tr>
-    <tr><td><code>GPIO35</code></td><td>input (ADC1_7)</td><td>BTS7960 #2 L_IS — actuator B retract current (input-only pin, OK for ADC)</td><td>yellow</td></tr>
+    <tr><td><code>GPIO32</code></td><td>input (ADC1_4)</td><td>BTS7960 #1 R_IS — actuator A retract current</td><td>yellow</td></tr>
+    <tr><td><code>GPIO33</code></td><td>input (ADC1_5)</td><td>BTS7960 #1 L_IS — actuator A extend current</td><td>yellow</td></tr>
+    <tr><td><code>GPIO34</code></td><td>input (ADC1_6)</td><td>BTS7960 #2 R_IS — actuator B retract current (input-only pin, OK for ADC)</td><td>yellow</td></tr>
+    <tr><td><code>GPIO35</code></td><td>input (ADC1_7)</td><td>BTS7960 #2 L_IS — actuator B extend current (input-only pin, OK for ADC)</td><td>yellow</td></tr>
     <tr><td><code>GPIO22</code></td><td>input (pull-up)</td><td>ENDSTOP B SIG (slide B side) — switch-to-GND on the Prusa MK3 board's NO contact. INPUT_PULLUP enabled in ESPHome. Endstop +Vcc must be on the 3.3 V rail (not 5 V) so the Prusa board's onboard LED/pull-up network can't drive this pin past the ESP32's 3.6 V max input.</td><td>white</td></tr>
     <tr><td><code>GPIO23</code></td><td>input (pull-up)</td><td>ENDSTOP A SIG (slide A side) — same wiring + same 3.3 V constraint as GPIO22.</td><td>white</td></tr>
     <tr><td><code>GPIO16</code></td><td>output</td><td>BC547 base (via 1 kΩ) → switches BC547 collector LOW, sinking F-1001 coil current to GND. F-1001 coil's + side is fed by SCREEN plug pin 1 from the 5 V rail. 1N4148 flyback diode lives off-board across the coil terminals.</td><td>white</td></tr>
@@ -3155,7 +3155,7 @@
 
 <h3 style="margin-top:32px">Perfboard layout (7 × 9 cm)</h3>
 <p style="margin-top:0;font-size:14px;color:var(--muted)">
-  Top-down view of the control board. Modules (ESP32, BTS7960 × 2, LM2596) plug into female sockets — never solder the dev boards permanently — so any one can be swapped without a full rework. Phoenix terminals run along the top edge so every external connection breaks cleanly by hand.
+  Top-down view of the control board. Modules (ESP32, BTS7960 × 2, LM2596) plug into female sockets — never solder the dev boards permanently — so any one can be swapped without a full rework. Phoenix terminals run along the top edge so every external connection breaks cleanly by hand. The <span style="color:#5b21b6;font-weight:700;">purple dashed circles marked "B"</span> at each of the four BTS IS pins mark the back-side <strong>IS-pin pulldown/filter mod</strong> (1 kΩ ∥ 100 nF from each IS pad to GND, installed 2026-07-05); the mini-schematic in the previously-empty LM2596 footprint shows the topology. All four instances are electrically identical.
 </p>
 
 <!-- Thumbnail legend -->
@@ -3372,9 +3372,46 @@
   -->
 
   <!-- ============ (LM2596 #1 moved to future 12 V board 2026-06-23) ============ -->
-  <!-- The 12 V → 5 V buck now lives upstream of Plug 1's 5 V IN. This area is empty       -->
-  <!-- on the main board; the rough x=380–500 / y=245–305 footprint can host future        -->
-  <!-- expansion or just be left as bare perfboard.                                        -->
+  <!-- The 12 V → 5 V buck now lives upstream of Plug 1's 5 V IN. Footprint now holds     -->
+  <!-- the IS-pin mod annotation (2026-07-05): 4× 1 kΩ + 4× 100 nF live on the BACK of    -->
+  <!-- the board, one R∥C pair from each IS pad → GND rail. The callout below is the      -->
+  <!-- schematic; the "•B" dots at each IS pin tag mark the back-side pair locations.     -->
+  <g transform="translate(380, 245)">
+    <rect x="0" y="0" width="130" height="80" rx="4" fill="#faf5ff" stroke="#7c3aed" stroke-width="1.2" stroke-dasharray="4 3"/>
+    <text x="65" y="14" text-anchor="middle" font-size="10" font-weight="700" fill="#5b21b6">IS-pin mod (back, ×4)</text>
+    <!-- schematic: node (IS pin) → R ∥ C → GND -->
+    <line x1="18" y1="34" x2="18" y2="66" stroke="#5b21b6" stroke-width="1.4"/>
+    <text x="14" y="32" text-anchor="end" font-size="8" fill="#5b21b6">IS pad</text>
+    <!-- resistor -->
+    <rect x="34" y="30" width="26" height="10" fill="#fff" stroke="#5b21b6" stroke-width="1"/>
+    <text x="47" y="38" text-anchor="middle" font-size="7.5" fill="#5b21b6">1 kΩ</text>
+    <line x1="18" y1="35" x2="34" y2="35" stroke="#5b21b6" stroke-width="1.2"/>
+    <line x1="60" y1="35" x2="112" y2="35" stroke="#5b21b6" stroke-width="1.2"/>
+    <!-- capacitor (parallel branch) -->
+    <line x1="78" y1="35" x2="78" y2="52" stroke="#5b21b6" stroke-width="1.2"/>
+    <line x1="70" y1="52" x2="86" y2="52" stroke="#5b21b6" stroke-width="1.4"/>
+    <line x1="70" y1="56" x2="86" y2="56" stroke="#5b21b6" stroke-width="1.4"/>
+    <text x="90" y="57" font-size="7.5" fill="#5b21b6">100 nF</text>
+    <!-- GND leg on the right -->
+    <line x1="112" y1="35" x2="112" y2="66" stroke="#5b21b6" stroke-width="1.4"/>
+    <!-- capacitor bottom to GND -->
+    <line x1="78" y1="56" x2="78" y2="66" stroke="#5b21b6" stroke-width="1.2"/>
+    <line x1="18" y1="66" x2="112" y2="66" stroke="#5b21b6" stroke-width="1.4" stroke-dasharray="3 2"/>
+    <text x="65" y="76" text-anchor="middle" font-size="7.5" fill="#5b21b6">→ GND rail</text>
+  </g>
+  <!-- Back-side dot indicators at each IS pin (BTS #1 R_IS, L_IS; BTS #2 R_IS, L_IS) -->
+  <g fill="#faf5ff" stroke="#7c3aed" stroke-width="1" stroke-dasharray="2 2">
+    <circle cx="266" cy="118" r="7"/>
+    <circle cx="266" cy="142" r="7"/>
+    <circle cx="266" cy="218" r="7"/>
+    <circle cx="266" cy="242" r="7"/>
+  </g>
+  <g fill="#7c3aed" font-size="7" font-weight="700" text-anchor="middle" font-family="monospace">
+    <text x="266" y="120">B</text>
+    <text x="266" y="144">B</text>
+    <text x="266" y="220">B</text>
+    <text x="266" y="244">B</text>
+  </g>
 
   <!-- ============ (FAN PWM driver lives on the fan-driver perfboard 2026-06-23) ============ -->
   <!-- IRLZ44N MOSFET, 220 Ω gate resistor, 10 kΩ pulldown, RB085T-60 Schottky flyback, -->
@@ -3850,12 +3887,12 @@
     </tr>
     <tr>
       <td><strong style="color:#047857;">25</strong></td>
-      <td>BTS #1 RPWM ↔ BTS #2 RPWM ↔ ESP32 GPIO 25 <em>(extend PWM, both modules in sync)</em></td>
+      <td>BTS #1 RPWM ↔ BTS #2 RPWM ↔ ESP32 GPIO 25 <em>(retract PWM, both modules in sync)</em></td>
       <td>green</td>
     </tr>
     <tr>
       <td><strong style="color:#047857;">26</strong></td>
-      <td>BTS #1 LPWM ↔ BTS #2 LPWM ↔ ESP32 GPIO 26 <em>(retract PWM, both modules in sync)</em></td>
+      <td>BTS #1 LPWM ↔ BTS #2 LPWM ↔ ESP32 GPIO 26 <em>(extend PWM, both modules in sync)</em></td>
       <td>green</td>
     </tr>
     <tr>
@@ -3880,22 +3917,22 @@
     </tr>
     <tr>
       <td><strong style="color:#78350f;">32</strong></td>
-      <td>BTS #1 R_IS → ESP32 GPIO 32 <em>(actuator A extend current sense)</em></td>
+      <td>BTS #1 R_IS → ESP32 GPIO 32 <em>(actuator A retract current sense; back-side <strong>1 kΩ ∥ 100 nF to GND</strong> — IS-pin mod)</em></td>
       <td>yellow</td>
     </tr>
     <tr>
       <td><strong style="color:#78350f;">33</strong></td>
-      <td>BTS #1 L_IS → ESP32 GPIO 33 <em>(actuator A retract current sense)</em></td>
+      <td>BTS #1 L_IS → ESP32 GPIO 33 <em>(actuator A extend current sense; back-side <strong>1 kΩ ∥ 100 nF to GND</strong> — IS-pin mod)</em></td>
       <td>yellow</td>
     </tr>
     <tr>
       <td><strong style="color:#78350f;">34</strong></td>
-      <td>BTS #2 R_IS → ESP32 GPIO 34 <em>(actuator B extend current sense)</em></td>
+      <td>BTS #2 R_IS → ESP32 GPIO 34 <em>(actuator B retract current sense; back-side <strong>1 kΩ ∥ 100 nF to GND</strong> — IS-pin mod)</em></td>
       <td>yellow</td>
     </tr>
     <tr>
       <td><strong style="color:#78350f;">35</strong></td>
-      <td>BTS #2 L_IS → ESP32 GPIO 35 <em>(actuator B retract current sense)</em></td>
+      <td>BTS #2 L_IS → ESP32 GPIO 35 <em>(actuator B extend current sense; back-side <strong>1 kΩ ∥ 100 nF to GND</strong> — IS-pin mod)</em></td>
       <td>yellow</td>
     </tr>
     <tr>
@@ -5218,27 +5255,39 @@
   so the Apple TV's CEC wake reads the current config and plays accordingly.
 </p>
 
+<p style="font-size:14px;color:var(--muted);margin-top:12px">
+  <strong>2026-07-05 rearchitecture:</strong> everything runs on Main zone via
+  <code>PSFRONT</code> (Front Speaker A/B switching). Zone 2 is no longer used.
+  Why: HDMI-CEC volume commands from the Apple TV always target Main zone —
+  the X2800H has no way to route them to Zone 2 — so keeping porch speakers
+  on Zone 2 broke Apple-TV-remote volume control in outdoor mode. Moving
+  porch to Main Front B keeps a single volume variable, which the Apple TV
+  controls natively. <code>MSSTEREO</code> in outdoor mode prevents
+  Center/Surround from bleeding to their indoor speakers while Front B plays.
+</p>
+
 <div class="card" style="font-family:ui-monospace, SFMono-Regular, Menlo, monospace;font-size:13px">
   <strong style="font-family:-apple-system, BlinkMacSystemFont, sans-serif">INDOOR mode (button closes)</strong>
-<pre style="margin:8px 0 0;padding:10px 12px;background:#fafaf9;border-radius:6px;overflow-x:auto">VSMONI1     # Main HDMI to Monitor 1 only (TV)
-MUOFF       # Main zone audio active (house speakers)
-Z2OFF       # Zone 2 off (porch silent)</pre>
+<pre style="margin:8px 0 0;padding:10px 12px;background:#fafaf9;border-radius:6px;overflow-x:auto">VSMONI1        # Main HDMI to Monitor 1 only (TV)
+PSFRONT SPA    # Front A active → indoor 5.1 house speakers
+MSMOVIE        # Surround decode (auto-selects per stream)
+MUOFF          # Main zone unmuted</pre>
 </div>
 
 <div class="card" style="font-family:ui-monospace, SFMono-Regular, Menlo, monospace;font-size:13px">
   <strong style="font-family:-apple-system, BlinkMacSystemFont, sans-serif">OUTDOOR mode (button opens)</strong>
-<pre style="margin:8px 0 0;padding:10px 12px;background:#fafaf9;border-radius:6px;overflow-x:auto">VSMONI2     # Main HDMI to Monitor 2 only (projector)
-MUON        # Main zone audio muted (house speakers silent)
-Z2SOURCE    # Zone 2 mirrors Main source
-Z2ON        # Zone 2 on (porch speakers play)</pre>
+<pre style="margin:8px 0 0;padding:10px 12px;background:#fafaf9;border-radius:6px;overflow-x:auto">VSMONI2        # Main HDMI to Monitor 2 only (projector)
+PSFRONT SPB    # Front B active → porch stereo pair
+MSSTEREO       # Stereo mode — no Center/Surround bleed to indoor speakers
+MUOFF          # Main zone unmuted</pre>
 </div>
 
 <div class="card" style="font-family:ui-monospace, SFMono-Regular, Menlo, monospace;font-size:13px">
-  <strong style="font-family:-apple-system, BlinkMacSystemFont, sans-serif">BOTH mode (auto-fired if TV wakes during OUTDOOR)</strong>
-<pre style="margin:8px 0 0;padding:10px 12px;background:#fafaf9;border-radius:6px;overflow-x:auto">VSMONIAUTO  # Main HDMI to both outputs simultaneously
-MUOFF       # Main zone audio active (house speakers)
-Z2SOURCE
-Z2ON        # Zone 2 also continues (porch + house both play)</pre>
+  <strong style="font-family:-apple-system, BlinkMacSystemFont, sans-serif">BOTH mode (manual — same source everywhere)</strong>
+<pre style="margin:8px 0 0;padding:10px 12px;background:#fafaf9;border-radius:6px;overflow-x:auto">VSMONIAUTO     # Main HDMI to both outputs simultaneously
+PSFRONT A+B    # Both speaker pairs driven together
+MSSTEREO       # Stereo — Front B is a 2-ch pair
+MUOFF          # Main zone unmuted</pre>
 </div>
 
 <h3 style="margin-top:24px">Projector control (PJLink, port 4352)</h3>
@@ -5276,11 +5325,20 @@ Z2ON        # Zone 2 also continues (porch + house both play)</pre>
   <ul>
     <li>General → HDMI Setup → <strong>HDMI Control → ON</strong></li>
     <li>General → HDMI Setup → <strong>Power Off Control → All</strong> (Apple TV sleep cascades the AVR to standby)</li>
-    <li>Zones → Zone 2 → <strong>Source → SOURCE</strong> (mirrors Main)</li>
-    <li>Zones → Zone 2 → <strong>HDMI Output → ON</strong> (Out 2 fed by Main, so Zone 2 audio + projector both follow the same source)</li>
-    <li>Speaker Configuration → wire <strong>porch speakers to Zone 2 amp outputs</strong> on the back panel (replaces the old manual zone selector button-box entirely)</li>
+    <li>Speakers → Manual Setup → <strong>Amp Assign → 5.1ch + Front B</strong> <span class="tag warn">critical</span> — unlocks the Front A/B speaker switching the firmware uses. Zone 2 amp becomes 2-ch pre-out only (unused for now).</li>
+    <li>Speaker wiring:
+      <ul>
+        <li>Indoor 5.1 house speakers → <strong>Front A + Center + Surround + Sub</strong> terminals (unchanged from a normal 5.1 install)</li>
+        <li>Porch stereo pair → <strong>Front B</strong> terminals (this is the change from the original Zone-2-amp wiring plan)</li>
+      </ul>
+    </li>
     <li>Network → assign a <strong>static IP / DHCP reservation</strong> so the ESP32 can find it reliably for Telnet</li>
   </ul>
+  <p style="font-size:13px;color:var(--muted);margin:8px 0 0">
+    Once Amp Assign is set and speakers are wired, the ESP32 handles A/B
+    switching automatically via <code>PSFRONT SPA</code> / <code>PSFRONT SPB</code> on
+    wall-button state changes. No Zone 2 menu configuration needed.
+  </p>
 </div>
 
 <h3 style="margin-top:24px">User-facing flow — what they actually do</h3>

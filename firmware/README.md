@@ -49,17 +49,30 @@ esphome run projector-lift.yaml --device /dev/ttyUSB0
 ```bash
 docker run --rm -it \
   --user $(id -u):$(id -g) \
+  -e HOME=/config \
   -v "$PWD":/config -w /config \
   --device=/dev/ttyUSB0 \
   ghcr.io/esphome/esphome:latest run projector-lift.yaml --device /dev/ttyUSB0
 ```
 
-After the first wired flash, subsequent updates can go over WiFi — same
-command, drop the `--device` flag:
+`HOME=/config` gives platformio a writable home for `.platformio/` — without
+it, the compile aborts on `PermissionError: '/.platformio'` because uid 1000
+has no home in the container.
+
+After the first wired flash, subsequent updates can go over WiFi. mDNS does
+not resolve inside the container, so pass `--device <IP>` explicitly:
 
 ```bash
-esphome run projector-lift.yaml      # auto-discovers via mDNS
+docker run --rm --user $(id -u):$(id -g) -e HOME=/config \
+  -v "$PWD":/config -w /config \
+  ghcr.io/esphome/esphome:latest upload projector-lift.yaml --device 10.0.0.175
 ```
+
+**Do not add `auth:` to `web_server:`** — ESPHome web_server v3 (2026.6.3)
+silently disables the SPA's button-click dispatch when auth is enabled. The
+state stream keeps working so the failure is invisible until you try to
+press a button. LAN-only is the trust boundary; use a reverse proxy if you
+need auth.
 
 ## Bench bring-up sequence
 
@@ -165,12 +178,19 @@ during FAULT is ignored (run the Diag reset instead).
 The firmware opens TCP connections to the AVR and projector on lift state
 changes:
 
-- **Denon AVR-X2800H** (`${avr_ip}:23`) — VSMONI / MU / Z2 commands per §12
-  - OPENING fires `VSMONI2 / MUON / Z2SOURCE / Z2ON`
-  - CLOSING fires `VSMONI1 / MUOFF / Z2OFF`
-  - `avr_both` script fires `VSMONIAUTO / MUOFF / Z2SOURCE / Z2ON` — callable
-    from a HA automation when the Sony TV is woken with its own remote
-    during OUTDOOR mode
+- **Denon AVR-X2800H** (`${avr_ip}:23`) — VSMONI / PSFRONT / MS commands
+  - **AVR setup prerequisite**: Amp Assign = "5.1ch + Front B". Indoor 5.1
+    on Front A terminals; porch stereo pair on Front B terminals. Zone 2 is
+    not used by this firmware — the topology change makes Apple TV HDMI-CEC
+    volume Just Work everywhere, because CEC targets Main volume and Main
+    drives whichever Front pair is active.
+  - OPENING fires `VSMONI2 / PSFRONT SPB / MSSTEREO / MUOFF` (projector +
+    porch speakers; stereo mode so Center/Surround don't bleed indoors)
+  - CLOSING fires `VSMONI1 / PSFRONT SPA / MSMOVIE / MUOFF` (TV + indoor
+    speakers; movie mode restores surround decode)
+  - `avr_both` script fires `VSMONIAUTO / PSFRONT A+B / MSSTEREO / MUOFF` —
+    same source everywhere; useful when parents want listening in both
+    zones during a manual override
   - Polled every 5 s while OPEN — exposes `AVR monitor mode` text sensor
 - **Epson PowerLite L730U** (`${projector_ip}:4352`) — PJLink Class 1
   - OPENING fires `%1POWR 1` (before the actuators move)
