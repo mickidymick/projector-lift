@@ -54,8 +54,8 @@ substitutions:
   friendly: "Projector Lift"
 
   # Static endpoints — edit to match your DHCP reservations.
-  avr_ip: "192.168.1.50"        # Denon AVR-X2800H · Telnet :23
-  projector_ip: "192.168.1.51"  # Epson PowerLite L730U · PJLink :4352
+  avr_ip: "192.168.4.101"        # Denon AVR-X2800H · Telnet :23
+  projector_ip: "192.168.4.102"  # Epson PowerLite L730U · PJLink :4352 (wireless)
 
 esphome:
   name: ${name}
@@ -119,6 +119,9 @@ web_server:
     - id: safety_group
       name: "!! Safety"
       sorting_weight: 10
+    - id: intent_group
+      name: "What do you want to watch?"
+      sorting_weight: 15
     - id: primary_group
       name: "Primary control"
       sorting_weight: 20
@@ -894,37 +897,56 @@ script:
   # / Sub channels don't bleed to their (indoor) speakers while porch plays.
   # On return to indoor we set MOVIE so surround decode resumes for the TV.
   # ===========================================================================
+  # All three profile scripts use tcp_avr_apply_profile: query current state
+  # for all fields, then send set-commands only for fields that don't already
+  # match target. Denon writes cause brief HDMI re-negotiation glitches even
+  # when the value is unchanged at the protocol level, so we avoid redundant
+  # writes. Query-syntax quirks (per empirical probe of the X2800H):
+  #   VSMONI needs a space before '?';  PSFRONT / MS / MU do NOT.
   - id: avr_indoor
     then:
       - lambda: |-
-          int s = tcp_connect_retry("avr.indoor", "${avr_ip}", 23, 500, 1);
+          int s = tcp_connect_retry("avr.indoor", "${avr_ip}", 23, 1000, 1);
           if (s < 0) return;
-          static const char *cmds[] = {"VSMONI1\r",     "PSFRONT SPA\r", "MSMOVIE\r", "MUOFF\r"};
-          static const char *toks[] = {"VSMONI1",       "PSFRONT SPA",   "MSMOVIE",   "MUOFF"};
-          tcp_send_and_verify("avr.indoor", s, cmds, toks, 4);
+          static const AvrField fields[] = {
+            {"VSMONI ?\r",  "VSMONI",   "VSMONI1"},
+            {"PSFRONT?\r",  "PSFRONT",  "PSFRONT SPA"},
+            {"MS?\r",       "MS",       "MSMOVIE"},
+            {"MU?\r",       "MU",       "MUOFF"},
+          };
+          tcp_avr_apply_profile("avr.indoor", s, fields, 4);
           ::close(s);
 
   - id: avr_outdoor
     then:
       - lambda: |-
-          int s = tcp_connect_retry("avr.outdoor", "${avr_ip}", 23, 500, 1);
+          int s = tcp_connect_retry("avr.outdoor", "${avr_ip}", 23, 1000, 1);
           if (s < 0) return;
-          static const char *cmds[] = {"VSMONI2\r",     "PSFRONT SPB\r", "MSSTEREO\r", "MUOFF\r"};
-          static const char *toks[] = {"VSMONI2",       "PSFRONT SPB",   "MSSTEREO",   "MUOFF"};
-          tcp_send_and_verify("avr.outdoor", s, cmds, toks, 4);
+          static const AvrField fields[] = {
+            {"VSMONI ?\r",  "VSMONI",   "VSMONI2"},
+            {"PSFRONT?\r",  "PSFRONT",  "PSFRONT SPB"},
+            {"MS?\r",       "MS",       "MSSTEREO"},
+            {"MU?\r",       "MU",       "MUOFF"},
+          };
+          tcp_avr_apply_profile("avr.outdoor", s, fields, 4);
           ::close(s);
 
-  # avr_both = same source everywhere (Front A + Front B driven together). Kept
-  # around for manual "listening across the house" cases; not fired by the state
-  # machine. Sound mode stays STEREO because Front B is a 2-ch pair.
+  # avr_both = same source everywhere (Front A + Front B driven together).
+  # Fired by the "Watch both" intent button + the Diag button; not fired by
+  # the wall-button state machine (which alternates INDOOR / OUTDOOR only).
+  # Sound mode stays STEREO because Front B is a 2-ch pair.
   - id: avr_both
     then:
       - lambda: |-
-          int s = tcp_connect_retry("avr.both", "${avr_ip}", 23, 500, 1);
+          int s = tcp_connect_retry("avr.both", "${avr_ip}", 23, 1000, 1);
           if (s < 0) return;
-          static const char *cmds[] = {"VSMONIAUTO\r",  "PSFRONT A+B\r", "MSSTEREO\r", "MUOFF\r"};
-          static const char *toks[] = {"VSMONIAUTO",    "PSFRONT A+B",   "MSSTEREO",   "MUOFF"};
-          tcp_send_and_verify("avr.both", s, cmds, toks, 4);
+          static const AvrField fields[] = {
+            {"VSMONI ?\r",  "VSMONI",   "VSMONIAUTO"},
+            {"PSFRONT?\r",  "PSFRONT",  "PSFRONT A+B"},
+            {"MS?\r",       "MS",       "MSSTEREO"},
+            {"MU?\r",       "MU",       "MUOFF"},
+          };
+          tcp_avr_apply_profile("avr.both", s, fields, 4);
           ::close(s);
 
   - id: avr_query_monitor
@@ -962,10 +984,10 @@ script:
   - id: projector_power_on
     then:
       - lambda: |-
-          int s = tcp_connect_retry("pjlink.on", "${projector_ip}", 4352, 500, 1);
+          int s = tcp_connect_retry("pjlink.on", "${projector_ip}", 4352, 1000, 1);
           if (s < 0) return;
           std::string greet;
-          tcp_read_until_cr(s, greet, 500);
+          tcp_read_until_cr(s, greet, 800);
           if (greet.find("PJLINK 0") == std::string::npos) {
             ESP_LOGW("pjlink", "on: no PJLINK 0 greeting (auth on?): %s", greet.c_str());
             ::close(s);
@@ -975,7 +997,7 @@ script:
           tcp_send(s, cmd, strlen(cmd));
           // Read the POWR reply so we notice ERR3 (warming/cooling) etc.
           std::string reply;
-          tcp_read_until_cr(s, reply, 500);
+          tcp_read_until_cr(s, reply, 800);
           ::close(s);
           if (reply.find("POWR=OK") != std::string::npos) {
             ESP_LOGI("pjlink", "→ POWR 1 OK");
@@ -986,10 +1008,10 @@ script:
   - id: projector_power_off
     then:
       - lambda: |-
-          int s = tcp_connect_retry("pjlink.off", "${projector_ip}", 4352, 500, 1);
+          int s = tcp_connect_retry("pjlink.off", "${projector_ip}", 4352, 1000, 1);
           if (s < 0) return;
           std::string greet;
-          tcp_read_until_cr(s, greet, 500);
+          tcp_read_until_cr(s, greet, 800);
           if (greet.find("PJLINK 0") == std::string::npos) {
             ESP_LOGW("pjlink", "off: no PJLINK 0 greeting (auth on?): %s", greet.c_str());
             ::close(s);
@@ -998,7 +1020,7 @@ script:
           const char *cmd = "%1POWR 0\r";
           tcp_send(s, cmd, strlen(cmd));
           std::string reply;
-          tcp_read_until_cr(s, reply, 500);
+          tcp_read_until_cr(s, reply, 800);
           ::close(s);
           if (reply.find("POWR=OK") != std::string::npos) {
             ESP_LOGI("pjlink", "→ POWR 0 OK");
@@ -1016,7 +1038,7 @@ script:
             return;
           }
           std::string greet;
-          tcp_read_until_cr(s, greet, 500);
+          tcp_read_until_cr(s, greet, 800);
           if (greet.find("PJLINK 0") == std::string::npos) {
             ::close(s);
             return;
@@ -1024,7 +1046,7 @@ script:
           const char *q = "%1POWR ?\r";
           tcp_send(s, q, strlen(q));
           std::string resp;
-          tcp_read_until_cr(s, resp, 500);
+          tcp_read_until_cr(s, resp, 800);
           ::close(s);
           ESP_LOGI("pjlink", "POWR? → %s", resp.c_str());
 
@@ -1237,6 +1259,95 @@ button:
     web_server:
       sorting_group_id: safety_group
       sorting_weight: 20
+
+  # ----- INTENT BUTTONS ---------------------------------------------------
+  # Idempotent "get me to this state" buttons for the phone-pinned web UI.
+  # Unlike the wall button (which toggles based on endstops), these declare a
+  # target: they cancel-and-reverse any in-flight motion, and if the lift is
+  # already at the target state they just re-fire the AVR + projector commands
+  # to self-heal a confused AV chain. Order and behavior mapped to the doc's
+  # "What do you want to watch?" section in index.html §12.
+  - platform: template
+    name: "Watch inside"
+    icon: mdi:television-classic
+    on_press:
+      - lambda: |-
+          using esphome::projector_lift::State;
+          auto s = id(lift).get_state();
+          if (s == State::CLOSED || s == State::COOLDOWN) {
+            // Lift is already in / returning to the closed baseline;
+            // just re-assert projector-off + AVR-indoor. No motion.
+            id(projector_power_off)->execute();
+            id(avr_indoor)->execute();
+          } else {
+            // request_close() fires on_closing_ (projector_power_off +
+            // avr_indoor) and cancels any in-flight OPENING.
+            id(lift).request_close();
+          }
+    web_server:
+      sorting_group_id: intent_group
+      sorting_weight: 10
+
+  - platform: template
+    name: "Watch on projector"
+    icon: mdi:projector-screen
+    on_press:
+      - lambda: |-
+          using esphome::projector_lift::State;
+          auto s = id(lift).get_state();
+          if (s == State::OPEN || s == State::OPENING) {
+            // Already deployed / on the way; re-assert AV chain only.
+            id(projector_power_on)->execute();
+            id(avr_outdoor)->execute();
+          } else {
+            // request_open() fires on_opening_ (projector_power_on +
+            // avr_outdoor) and cancels any in-flight CLOSING / COOLDOWN.
+            id(lift).request_open();
+          }
+    web_server:
+      sorting_group_id: intent_group
+      sorting_weight: 20
+
+  - platform: template
+    name: "Watch both"
+    icon: mdi:speaker-multiple
+    on_press:
+      # Same source everywhere: TV + projector, house 5.1 + porch stereo.
+      # If lift isn't open, request_open() runs the full OPEN sequence
+      # (which fires avr_outdoor from on_opening_). We follow up with
+      # avr_both after a settle delay so it overrides and lands the AVR
+      # in Front A+B mode. AVR handles the back-to-back writes fine.
+      - lambda: |-
+          using esphome::projector_lift::State;
+          auto s = id(lift).get_state();
+          if (s != State::OPEN && s != State::OPENING) {
+            id(lift).request_open();
+          }
+      - delay: 500ms
+      - script.execute: projector_power_on
+      - script.execute: avr_both
+    web_server:
+      sorting_group_id: intent_group
+      sorting_weight: 30
+
+  - platform: template
+    name: "Re-sync AV (don't move the lift)"
+    icon: mdi:sync-alert
+    on_press:
+      # "CEC picked the wrong input" / "someone touched the AVR remote" /
+      # "the projector missed the power command" — re-fires the AVR and
+      # projector commands matching the current lift state, no motion.
+      - lambda: |-
+          if (id(lift).is_projector_active()) {
+            id(projector_power_on)->execute();
+            id(avr_outdoor)->execute();
+          } else {
+            id(projector_power_off)->execute();
+            id(avr_indoor)->execute();
+          }
+    web_server:
+      sorting_group_id: intent_group
+      sorting_weight: 40
 
   - platform: template
     name: "Wall button (virtual)"

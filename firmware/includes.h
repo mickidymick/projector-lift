@@ -149,18 +149,23 @@ inline int tcp_connect_retry(const char *tag, const char *ip, uint16_t port,
 }
 
 // Send N commands in sequence over an already-connected socket, spacing them
-// by inter_cmd_ms (Denon docs recommend ~50 ms; some X-series firmware silently
-// drops back-to-back writes). After the last send, reads acks for ack_timeout_ms
-// and verifies each `expected[i]` substring appears in the response.
-// Returns true if every expected token was echoed, false otherwise. Logs each
-// missing ack and the collected reply through `tag`.
-// Caller owns the socket; this function does not close it.
+// by inter_cmd_ms, then read for ack_timeout_ms and log which expected tokens
+// were echoed vs. silent.
+//
+// Denon X-series Telnet only echoes commands that *change* state — a command
+// whose target already matches current state produces no reply, even with a
+// long read window. So a missing echo is NOT a failure; it means "already at
+// target (or silently accepted)." The only real failure signal we have is
+// tcp_send() returning false (socket died mid-write). Callers that want true
+// verification should query state after the fact (e.g. `VSMONI ?`).
+//
+// Returns true unless a TCP send fails. Caller owns the socket.
 inline bool tcp_send_and_verify(const char *tag, int sock,
                                 const char *const *cmds,
                                 const char *const *expected,
                                 int count,
                                 int inter_cmd_ms = 50,
-                                int ack_timeout_ms = 500) {
+                                int ack_timeout_ms = 800) {
   for (int i = 0; i < count; i++) {
     if (!tcp_send(sock, cmds[i], std::strlen(cmds[i]))) {
       ESP_LOGW(tag, "send fail on cmd[%d]='%s'", i, cmds[i]);
@@ -172,17 +177,117 @@ inline bool tcp_send_and_verify(const char *tag, int sock,
   }
   std::string acks;
   tcp_read_all(sock, acks, ack_timeout_ms);
-  bool all_ok = true;
+
+  std::string echoed, silent;
   for (int i = 0; i < count; i++) {
-    if (acks.find(expected[i]) == std::string::npos) {
-      ESP_LOGW(tag, "no ack for '%s'", expected[i]);
-      all_ok = false;
-    }
+    std::string &bucket = (acks.find(expected[i]) != std::string::npos)
+                          ? echoed : silent;
+    if (!bucket.empty()) bucket += ",";
+    bucket += expected[i];
   }
   // Render CRs as '|' for a single readable log line.
   std::string log_acks;
   for (char c : acks) log_acks += (c == '\r' ? '|' : c);
-  if (all_ok) ESP_LOGI(tag, "ok (ack: %s)", log_acks.c_str());
-  else        ESP_LOGW(tag, "partial ack (got: %s)", log_acks.c_str());
-  return all_ok;
+  ESP_LOGI(tag, "sent=%d echoed=[%s] silent=[%s] reply=%s",
+           count, echoed.c_str(), silent.c_str(), log_acks.c_str());
+  return true;
+}
+
+// One field of an AVR profile — how to query it, which response line to match,
+// and what value we want set.
+//   query  : full query command including trailing '\r' (e.g. "VSMONI ?\r").
+//            Query syntax is inconsistent per-command on Denon X2800H:
+//              PW?, MU?, MS?, SI?, PSFRONT?     — NO space before '?'
+//              VSMONI ?                          — SPACE required before '?'
+//            When adding new fields, confirm empirically via a Telnet probe.
+//   prefix : the leading token of the answer line to match against, so we
+//            can pick the actual response out of a multi-line reply that
+//            may also contain side-effect notifications (e.g. querying
+//            PSFRONT returns "SSFRSDST SPA\rPSFRONT SPA\r" — we want the
+//            PSFRONT line).
+//   target : the set-command payload we want the field to hold (no trailing
+//            '\r' — the applier adds it). Also used verbatim to check
+//            equality against the current response line.
+struct AvrField {
+  const char *query;
+  const char *prefix;
+  const char *target;
+};
+
+// Read-modify-write applier: pipeline all queries, read all responses in one
+// window, diff each field against target, then pipeline write-commands only
+// for fields that actually drifted. Silent when everything matches — no
+// dropouts from redundant writes.
+//
+// Total wall time ≈ (count-1)*inter_cmd_ms + read_ms + (writes-1)*inter_cmd_ms.
+// For count=4, inter_cmd=50, read=500: ~700-900 ms cold, ~700 ms if nothing
+// drifted. This is close to the old blind-write cost, without the churn.
+//
+// If a query returns no matching prefix line (AVR was slow or gave junk),
+// falls through to writing the target — same at-least-once semantics as the
+// original blind-write function. Logged as "was:?" so it's easy to spot.
+//
+// Returns the number of writes actually issued, or -1 on TCP send failure.
+inline int tcp_avr_apply_profile(const char *tag, int sock,
+                                  const AvrField *fields, int count,
+                                  int inter_cmd_ms = 50,
+                                  int read_ms = 500) {
+  // Phase 1: pipeline all queries.
+  for (int i = 0; i < count; i++) {
+    if (!tcp_send(sock, fields[i].query, std::strlen(fields[i].query))) {
+      ESP_LOGW(tag, "query send fail: %s", fields[i].prefix);
+      return -1;
+    }
+    if (i + 1 < count && inter_cmd_ms > 0) ::usleep(inter_cmd_ms * 1000);
+  }
+
+  // Phase 2: read all responses into one buffer.
+  std::string buf;
+  tcp_read_all(sock, buf, read_ms);
+
+  // Phase 3: diff. Collect targets that need writing.
+  // 8-slot fixed cap — no AVR profile in this project uses more than 4.
+  const char *to_write[8];
+  int to_write_n = 0;
+  std::string skip_list, write_list;
+  for (int i = 0; i < count && i < 8; i++) {
+    const AvrField &f = fields[i];
+    std::string cur;
+    size_t start = 0, plen = std::strlen(f.prefix);
+    while (start < buf.size()) {
+      size_t end = buf.find('\r', start);
+      if (end == std::string::npos) end = buf.size();
+      if (end - start >= plen &&
+          buf.compare(start, plen, f.prefix, plen) == 0) {
+        cur = buf.substr(start, end - start);
+        break;
+      }
+      start = end + 1;
+    }
+    if (cur == f.target) {
+      if (!skip_list.empty()) skip_list += ",";
+      skip_list += f.target;
+    } else {
+      if (!write_list.empty()) write_list += ",";
+      write_list += std::string(f.target) + "(was:" +
+                    (cur.empty() ? "?" : cur) + ")";
+      to_write[to_write_n++] = f.target;
+    }
+  }
+
+  // Phase 4: pipeline the writes.
+  for (int i = 0; i < to_write_n; i++) {
+    std::string cmd = std::string(to_write[i]) + "\r";
+    if (!tcp_send(sock, cmd.c_str(), cmd.size())) {
+      ESP_LOGW(tag, "write send fail: %s", to_write[i]);
+      return -1;
+    }
+    if (i + 1 < to_write_n && inter_cmd_ms > 0) ::usleep(inter_cmd_ms * 1000);
+  }
+
+  ESP_LOGI(tag, "wrote=%d skipped=[%s] changes=[%s]",
+           to_write_n,
+           skip_list.empty()  ? "-" : skip_list.c_str(),
+           write_list.empty() ? "-" : write_list.c_str());
+  return to_write_n;
 }

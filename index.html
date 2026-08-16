@@ -1326,8 +1326,8 @@
         <img src="https://m.media-amazon.com/images/I/61eVFGHhWlL._AC_SL1500_.jpg" alt="Denon AVR-X2800H 7.2-channel A/V receiver" loading="lazy">
       </div>
       <div class="info">
-        <div class="name">Denon AVR-X2800H <span style="color:var(--muted);font-weight:400;font-size:12px">7.2ch · HDMI 2.1 · eARC · Zone 2 amp + HDMI out · <strong>Factory Certified Refurbished</strong></span></div>
-        <div class="desc">Replaces the 2013 AVR-X2000. Two key features make the whole UX work: (1) <strong>two independent HDMI outputs</strong> — Out 1 → TV, Out 2 → projector — no splitter, no EDID downscaling, each display negotiates its own signal; (2) <strong>Zone 2 with its own amp + HDMI output</strong> — porch speakers wire directly to Zone 2 amp outputs, replacing the manual zone button-box. Telnet + HTTP control API lets the lift's ESP32 send mode commands (VSMONI1/2, MUON/OFF, Z2ON/OFF) on wall-button state change. Reliable HDMI-CEC for Apple TV power-button wake/sleep.
+        <div class="name">Denon AVR-X2800H <span style="color:var(--muted);font-weight:400;font-size:12px">7.2ch · HDMI 2.1 · eARC · dual HDMI out · Front A/B speaker switching · <strong>Factory Certified Refurbished</strong></span></div>
+        <div class="desc">Replaces the 2013 AVR-X2000. Two key features make the whole UX work: (1) <strong>two independent HDMI outputs</strong> — Out 1 → TV, Out 2 → projector — no splitter, no EDID downscaling, each display negotiates its own signal; (2) <strong>Front A / Front B speaker switching</strong> under the "5.1ch + Front B" amp assign — indoor 5.1 lives on Front A + Center + Surround + Sub terminals, porch stereo pair goes directly on Front B terminals, replacing the manual zone button-box. Telnet control API lets the lift's ESP32 send mode commands (<code>VSMONI1/2</code>, <code>PSFRONT SPA/SPB</code>, <code>MSSTEREO/MOVIE</code>) on wall-button state change; Apple TV HDMI-CEC volume targets Main, so a single volume variable controls whichever Front pair is active. Reliable HDMI-CEC for Apple TV power-button wake/sleep.
         <br><br>
         <strong>Refurb decision (2026-06-09):</strong> the X2800H is end-of-life — current 2026 model is the AVR-X2900H at $1,349 MSRP. New X2800H at retail ($1,170–1,299) lost its budget-tier rationale. Factory Certified Refurbished at $999.50 restores it: same chassis, same firmware, same Telnet API, full Denon warranty. ~$300 saved vs. new X2900H with no functional compromise for our build (we don't need Dirac Live or FreeSync).</div>
       </div>
@@ -1430,12 +1430,12 @@
 
   <div class="buy-reuse">
     <strong>Reuse from existing system / on-hand stock (no cost)</strong>
-    IR repeater · CZH-LABS F-1001/5V relay (screen 12V trigger) · AC power strip · drawer slides (×4) · <strong>existing 120" 16:9 VMAX2 screen</strong> (proven 10+ yr porch survival, manual tensioner workflow continues) · <strong>Sony XR-55A80K TV</strong> · <strong>house speakers + porch speakers</strong> (re-terminated to new AVR Zone 1 main + Zone 2 amp outputs) · <strong>existing 50 ft HDMI 2.0 cable</strong> Denon→projector run (re-terminated to new AVR Out 2; 4K60/HDR/ARC-rated, ~4× headroom over WUXGA60) · <strong>existing TV-Denon HDMI cable</strong> (re-terminated to new AVR Out 1; verify 4K HDR pass-through after install, $15 swap if flaky) · <strong>Cat5e from Zach's on-hand stock</strong> for projector PJLink run · <strong>pneumatic gas struts (×2)</strong> from a prior build, mounted between short walls + lid underside to hold the service lid open hands-free
+    IR repeater · CZH-LABS F-1001/5V relay (screen 12V trigger) · AC power strip · drawer slides (×4) · <strong>existing 120" 16:9 VMAX2 screen</strong> (proven 10+ yr porch survival, manual tensioner workflow continues) · <strong>Sony XR-55A80K TV</strong> · <strong>house 5.1 speakers</strong> (re-terminated to new AVR Front A + Center + Surround + Sub) · <strong>porch stereo pair</strong> (re-terminated to new AVR Front B) · <strong>existing 50 ft HDMI 2.0 cable</strong> Denon→projector run (re-terminated to new AVR Out 2; 4K60/HDR/ARC-rated, ~4× headroom over WUXGA60) · <strong>existing TV-Denon HDMI cable</strong> (re-terminated to new AVR Out 1; verify 4K HDR pass-through after install, $15 swap if flaky) · <strong>Cat5e from Zach's on-hand stock</strong> for projector PJLink run · <strong>pneumatic gas struts (×2)</strong> from a prior build, mounted between short walls + lid underside to hold the service lid open hands-free
   </div>
 
   <div class="buy-reuse" style="margin-top:10px;background:#fef2f2;border:1px solid #fecaca;color:#7f1d1d">
     <strong style="color:#7f1d1d">Removed from rack (no longer used)</strong>
-    Denon AVR-X2000 (2013, HDMI 1.4 ceiling) · Avedio HDMI splitter (no longer needed — AVR has two HDMI outs) · Apple TV A1469 (2013, 3rd gen) · manual speaker zone button-box (replaced by AVR Zone 2) · Logitech Harmony Hub + IR repeater pickup (replaced by HDMI-CEC + Apple TV remote) · optical TV→AVR cable (TV apps no longer used)
+    Denon AVR-X2000 (2013, HDMI 1.4 ceiling) · Avedio HDMI splitter (no longer needed — AVR has two HDMI outs) · Apple TV A1469 (2013, 3rd gen) · manual speaker zone button-box (replaced by AVR Front A/B switching) · Logitech Harmony Hub + IR repeater pickup (replaced by HDMI-CEC + Apple TV remote) · optical TV→AVR cable (TV apps no longer used)
   </div>
 
   <p style="margin-top:14px;margin-bottom:0;font-size:14px;color:var(--muted)">
@@ -5073,7 +5073,7 @@
   <img src="https://m.media-amazon.com/images/I/61eVFGHhWlL._AC_SL1500_.jpg" alt="Denon AVR-X2800H 7.2-channel A/V receiver" style="width:200px;height:auto;flex-shrink:0;border-radius:4px">
   <div style="flex:1;min-width:240px">
     <h3 style="margin:0 0 6px">Denon AVR-X2800H — Factory Certified Refurbished</h3>
-    <p style="margin:0 0 12px;color:var(--muted);font-size:14px">7.2ch · 95W × 7 · HDMI 2.1 · eARC · Zone 2 amp + HDMI out · HEOS</p>
+    <p style="margin:0 0 12px;color:var(--muted);font-size:14px">7.2ch · 95W × 7 · HDMI 2.1 · eARC · dual HDMI out · Front A/B speaker switching · HEOS</p>
     <p style="margin:0 0 12px;font-size:18px;font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums">$999.50 — Amazon (Factory Certified Refurbished, full warranty)</p>
     <a href="https://www.amazon.com/Denon-AVR-X2800H-Channel-Theater-Receiver/dp/B0C5S64TVN" target="_blank" rel="noopener" style="display:inline-block;padding:7px 16px;background:var(--accent);color:#fff;text-decoration:none;border-radius:5px;font-size:13px;font-weight:600">Buy on Amazon</a>
   </div>
@@ -5093,9 +5093,9 @@
   </p>
   <p class="why">
     <strong>The refurb wins here</strong> because Denon hasn't broken the
-    Telnet control protocol between generations — VSMONI / Z2 / MU commands
-    work identically — so the ESP32 firmware design carries over without
-    change either direction. The X2900H's two real additions (Dirac Live
+    Telnet control protocol between generations — VSMONI / PSFRONT / MS
+    commands work identically — so the ESP32 firmware design carries over
+    without change either direction. The X2900H's two real additions (Dirac Live
     license option, AMD FreeSync) are features this build doesn't use:
     we're not gaming on the porch, and Audyssey MultEQ XT is more than
     enough room correction for a screened-porch listening environment with
@@ -5113,8 +5113,8 @@
 
 <ol>
   <li><strong>Two independent HDMI outputs.</strong> The whole "TV stays asleep when projector is in use" design hinges on this — Out 1 → TV and Out 2 → projector, each negotiating its own EDID. Replaces the Avedio splitter (which auto-downscales to the lowest display) and gives the Sony A80K its full 4K HDR capability back without sacrificing the projector run.</li>
-  <li><strong>Zone 2 with built-in amplification + dedicated HDMI output.</strong> Porch speakers wire directly to Zone 2 amp outputs on the back panel — the manual speaker zone button-box is unplugged and removed entirely. Zone 2 HDMI Out 2 carries the same source signal to the projector while Zone 1 is muted or asleep.</li>
-  <li><strong>Telnet (TCP port 23) + HTTP control APIs.</strong> The ESP32 in the lift box sends raw command strings to the AVR over the LAN: <code>VSMONI1/2/AUTO</code> for HDMI routing, <code>MUON/OFF</code> for main-zone mute, <code>Z2ON/OFF</code> + <code>Z2SOURCE</code> for porch audio. Settings persist across standby so we only send on wall-button state changes, not on every Apple TV wake. (Full sequence in Section 12.)</li>
+  <li><strong>Front A / Front B speaker switching under "5.1ch + Front B" amp assign.</strong> Indoor 5.1 lives on Front A + Center + Surround + Sub terminals; porch stereo pair wires directly to Front B terminals — the manual zone button-box is unplugged and removed entirely. Both pairs share the Main amp and DSP, so Apple TV HDMI-CEC volume commands (which always target Main) control whichever pair is active. <em>Design note (2026-07-05):</em> the earlier plan used Zone 2 for porch audio, which broke CEC volume in outdoor mode because Zone 2 has an independent volume knob CEC can't touch. Front A/B keeps everything on one volume variable.</li>
+  <li><strong>Telnet (TCP port 23) + HTTP control APIs.</strong> The ESP32 in the lift box sends raw command strings to the AVR over the LAN: <code>VSMONI1/2/AUTO</code> for HDMI routing, <code>PSFRONT SPA/SPB/A+B</code> for Front A/B switching, <code>MSSTEREO/MOVIE</code> for surround mode, <code>MUOFF</code> for main-zone unmute. Settings persist across standby so we only send on wall-button state changes, not on every Apple TV wake. (Full sequence in Section 12.)</li>
   <li><strong>Reliable HDMI-CEC.</strong> Modern Denon CEC ("Denon CEC") wakes the AVR + correct input automatically when the Apple TV powers on, and the Apple TV's Siri Remote volume buttons pass through to the AVR. This is the entire "single-button UX" foundation — older receivers (including the existing 2013 AVR-X2000) have flaky CEC implementations that won't sustain the design.</li>
 </ol>
 
@@ -5125,8 +5125,8 @@
     <tbody>
       <tr><th>Power</th><td>95W × 7 channels @ 8 Ω (or 7.2 with subs)</td></tr>
       <tr><th>HDMI inputs</th><td>6 (3 are HDMI 2.1 / 8K-capable)</td></tr>
-      <tr><th>HDMI outputs</th><td><strong>2 independent</strong> (Main + Zone 2) — the deal-maker</td></tr>
-      <tr><th>Zones</th><td>Main + Zone 2 (with own amp + HDMI out)</td></tr>
+      <tr><th>HDMI outputs</th><td><strong>2 independent</strong> (Monitor 1 + Monitor 2) — the deal-maker</td></tr>
+      <tr><th>Speaker layout</th><td>5.1ch + Front B (front-A/B switching drives indoor 5.1 vs porch stereo from the Main amp). Zone 2 amp exists but is unused in this build.</td></tr>
       <tr><th>Room correction</th><td>Audyssey MultEQ XT</td></tr>
       <tr><th>Audio formats</th><td>Dolby Atmos, DTS:X, IMAX Enhanced</td></tr>
       <tr><th>Network</th><td>Ethernet (preferred for Telnet reliability) + Wi-Fi + Bluetooth</td></tr>
@@ -5148,7 +5148,7 @@
     <tr>
       <td><strong>AVR-X2900H</strong> (current successor)<br><span style="color:var(--muted);font-size:12px">2026 launch, direct replacement</span></td>
       <td class="price">$1,200–1,349</td>
-      <td>Same Zone 2 + HDMI architecture, same Telnet API. Adds Dirac Live (license extra) and AMD FreeSync — features this build doesn't use. Pay $300+ more for nothing functional. <strong>Becomes the right pick if refurb X2800H stock is gone at order time.</strong></td>
+      <td>Same dual-HDMI-out + Front A/B architecture, same Telnet API. Adds Dirac Live (license extra) and AMD FreeSync — features this build doesn't use. Pay $300+ more for nothing functional. <strong>Becomes the right pick if refurb X2800H stock is gone at order time.</strong></td>
     </tr>
     <tr>
       <td><strong>AVR-X2800H, new retail</strong></td>
@@ -5158,17 +5158,17 @@
     <tr>
       <td><strong>Marantz Cinema 60</strong><br><span style="color:var(--muted);font-size:12px">Denon's sister brand, same platform</span></td>
       <td class="price">$1,500–1,800</td>
-      <td>Same chassis underneath, same control API, same Zone 2 architecture. Premium for the slim form factor + Marantz styling. Zero functional advantage for this build.</td>
+      <td>Same chassis underneath, same control API, same dual-HDMI-out architecture. Premium for the slim form factor + Marantz styling. Zero functional advantage for this build.</td>
     </tr>
     <tr>
       <td><strong>Onkyo TX-NR6100</strong></td>
       <td class="price">$700–900</td>
-      <td>On paper has 2 HDMI outs + Zone 2 amp at a competitive price. In practice: less mature Telnet control protocol (firmware rewrite for the ESP32), historically buggier HDMI-CEC, and Onkyo's brand reliability reputation took serious damage from the 2014–2018 HDMI-board failure era. Skip for a "parents need it to just work, unattended, for a decade" build.</td>
+      <td>On paper has 2 HDMI outs at a competitive price. In practice: less mature Telnet control protocol (firmware rewrite for the ESP32), historically buggier HDMI-CEC, and Onkyo's brand reliability reputation took serious damage from the 2014–2018 HDMI-board failure era. Skip for a "parents need it to just work, unattended, for a decade" build.</td>
     </tr>
     <tr>
       <td><strong>Denon AVR-X3800H</strong> (step-up)</td>
       <td class="price">$1,700–1,900</td>
-      <td>9.4ch, 3 HDMI outs, Audyssey XT32 (better room correction), more streaming. Overkill for our 5.1 + Zone 2 speaker layout. Pay for capability we'd never wire up.</td>
+      <td>9.4ch, 3 HDMI outs, Audyssey XT32 (better room correction), more streaming. Overkill for our 5.1 + Front B speaker layout. Pay for capability we'd never wire up.</td>
     </tr>
     <tr>
       <td><strong>Sony STR-AN1000</strong></td>
@@ -5238,13 +5238,8 @@
     </tr>
     <tr>
       <td>(any)</td>
-      <td>BOTH <span style="color:var(--muted);font-weight:400">— auto-detected</span></td>
-      <td colspan="2">If the Sony TV is manually woken with its own remote while OUTDOOR mode is active <em>and</em> the user keeps the AVR Main source on Apple TV, the ESP32 reconfigures Main HDMI to both outputs + un-mutes house speakers. Same Apple TV content plays everywhere. See <strong>Card 1</strong> below.</td>
-    </tr>
-    <tr>
-      <td>OPEN</td>
-      <td>INDEPENDENT <span style="color:var(--muted);font-weight:400">— manual override</span></td>
-      <td colspan="2">Wall button OPEN + Sony TV remote woken + TV uses its own built-in apps (Netflix, etc.). TV apps audio returns to the AVR via eARC, plays through the Main zone / house speakers. Meanwhile Zone 2 keeps Apple TV → projector + porch speakers. <strong>Two displays, two different sources, two audio zones — all at once.</strong> Wired up natively in the AVR; no firmware change. See <strong>Card 2</strong> below.</td>
+      <td>BOTH <span style="color:var(--muted);font-weight:400">— manual override</span></td>
+      <td colspan="2">Same Apple TV content playing everywhere at once — house 5.1 + porch stereo, TV + projector. Fired by the <code>Diag: AVR → BOTH</code> button (or an HA automation): sets <code>VSMONIAUTO / PSFRONT A+B / MSSTEREO</code>. Since Front A and Front B share the Main amp, the same source runs to both speaker pairs by design. See <strong>Card 1</strong> below.</td>
     </tr>
   </tbody>
 </table>
@@ -5342,6 +5337,60 @@ MUOFF          # Main zone unmuted</pre>
   </p>
 </div>
 
+<h3 style="margin-top:24px">The phone app — Dad's iPhone shortcut</h3>
+
+<div class="card">
+  <p style="margin:0 0 10px;font-size:14px">
+    The ESP32 hosts its own local web UI (LAN-only, no login) on
+    <code>http://&lt;lift-ip&gt;/</code>. On Dad's iPhone, open Safari to that
+    URL, tap the Share button → <strong>Add to Home Screen</strong>. iOS pins
+    it as an app-style icon; it opens full-screen with no Safari chrome, so it
+    reads and behaves like a native app.
+  </p>
+  <p style="margin:0 0 10px;font-size:14px">
+    At the top of the page, above everything else, is a <strong>"What do you
+    want to watch?"</strong> section with four large buttons. These are
+    <em>intent</em> buttons — press one and the system does whatever is needed
+    to get to that state. If the box is in the wrong position it moves; if the
+    AVR is on the wrong mode it re-fires the Telnet commands; if the projector
+    missed a power command it re-sends it. Same button press covers all of it.
+  </p>
+
+  <table style="margin-top:10px">
+    <thead>
+      <tr><th>Button</th><th>What it does</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Watch inside</strong></td>
+        <td>Puts everything in indoor mode: box closed, projector off, AVR routed to the TV + house 5.1 speakers, surround decode restored. Press this whenever the family is done watching outside, or whenever the indoor picture / sound looks wrong.</td>
+      </tr>
+      <tr>
+        <td><strong>Watch on projector</strong></td>
+        <td>Puts everything in outdoor mode: box down, projector on, AVR routed to the projector + porch stereo, stereo mode (no Center/Surround bleed indoors). Press this when heading outside to watch.</td>
+      </tr>
+      <tr>
+        <td><strong>Watch both</strong></td>
+        <td>Same Apple TV content playing everywhere at once — TV + projector, house 5.1 + porch stereo. Box goes down if it wasn't already. Press this for family movie night when people are split between rooms.</td>
+      </tr>
+      <tr>
+        <td><strong>Re-sync AV</strong> <span style="color:var(--muted);font-weight:400;font-size:13px">(don't move the lift)</span></td>
+        <td>Doesn't touch the box. Just re-fires the AVR + projector commands matching the box's current position. This is the fix-it button for "picture is on the wrong screen", "no sound / wrong speakers", "Apple TV remote volume stopped working", or any other CEC weirdness. Try this before touching a physical remote.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p style="margin:12px 0 0;font-size:13px;color:var(--muted)">
+    All four buttons are idempotent: pressing the same one twice does no harm.
+    Pressing one during a lift transition (e.g. tapping <strong>Watch inside</strong>
+    while the box is still opening) cancels the current motion and reverses to
+    the new target. There is also a <strong>!! STOP</strong> button in the Safety
+    section at the very top — press it if the box is moving and you need it to
+    stop <em>right now</em>; then tap <strong>Diag: reset to CLOSED</strong> in
+    the Diagnostics section to bring it back to a known state.
+  </p>
+</div>
+
 <h3 style="margin-top:24px">User-facing flow — what they actually do</h3>
 
 <div class="card">
@@ -5374,12 +5423,24 @@ MUOFF          # Main zone unmuted</pre>
   </ol>
 </div>
 
-<h3 style="margin-top:24px">Printable instructions — occasional-use cards</h3>
+<h3 style="margin-top:24px">Printable instructions — occasional-use card</h3>
 
 <p style="color:var(--muted);font-size:14px">
-  Two side cases the wall button + Apple TV remote don't cover by themselves.
-  Print and laminate both, keep near the TV. Each card describes a manual
-  sequence — none of them are needed for normal everyday use.
+  One side case the wall button + Apple TV remote don't cover by itself.
+  Print and laminate, keep near the TV. The card describes a manual sequence —
+  not needed for normal everyday use.
+</p>
+
+<p style="color:var(--muted);font-size:13px;background:#fef2f2;border:1px solid #fecaca;padding:8px 10px;border-radius:5px">
+  <strong>Note (2026-07-05 rearchitecture):</strong> the earlier <em>INDEPENDENT</em>
+  mode / Card 2 (TV apps on house speakers <em>while</em> Apple TV plays on porch
+  speakers, simultaneously with different content) is no longer supported. It
+  required Zone 2 as a truly independent second source path; the Front A/B
+  topology shares the Main amp between both speaker pairs and can only play
+  one source at a time. Card 2 removed. For the "different content in each
+  room" use case, use the TV's built-in apps on the TV <em>only</em> (leave
+  the AVR off / muted) and drive porch listening from a phone/AirPlay to a
+  separate device if needed.
 </p>
 
 <div class="card" style="border:2px dashed var(--accent);background:#fff">
@@ -5396,40 +5457,6 @@ MUOFF          # Main zone unmuted</pre>
 
   <h3 style="margin-top:18px">To turn EVERYTHING off</h3>
   <p>Press POWER on the Apple TV remote (turns off audio + projector). Then press the wall button (projector retracts into the ceiling).</p>
-</div>
-
-<div class="card" style="border:2px dashed var(--accent);background:#fff;margin-top:14px">
-  <span class="label">CARD 2 · PRINT &amp; KEEP NEAR THE TV</span>
-  <h3 style="margin-top:6px">To watch DIFFERENT things inside and outside at the same time</h3>
-  <p style="font-size:14px;color:var(--muted);margin-bottom:14px">
-    Example: the kids want to watch a movie outside on the projector, and you
-    want to watch the game inside on the TV with the indoor speakers — at the
-    same time, with different sound in each room.
-  </p>
-  <ol>
-    <li>Press the <strong>wall button</strong> so the projector is OPEN (down)</li>
-    <li>Press <strong>POWER on the Apple TV remote</strong> — projector + porch speakers turn on (kids' content)</li>
-    <li>Pick up the <strong>Sony TV remote</strong> and press <strong>POWER</strong> — TV wakes</li>
-    <li>On the TV, use its <strong>built-in apps</strong> (Netflix, Disney+, YouTube, whatever) instead of switching to the Apple TV input — pick what you want to watch indoors</li>
-  </ol>
-  <p style="margin-top:10px">
-    Each side now plays its own thing with its own audio:
-  </p>
-  <ul>
-    <li>Outside: <strong>Apple TV</strong> on the projector + porch speakers</li>
-    <li>Inside: <strong>TV apps</strong> on the Sony TV + house speakers</li>
-    <li>Different volumes — adjust each side with its own remote</li>
-  </ul>
-
-  <h3 style="margin-top:18px">To turn off the indoor side</h3>
-  <p>Press POWER on the Sony TV remote — TV + house speakers go quiet. Outside keeps playing.</p>
-
-  <h3 style="margin-top:18px">To turn EVERYTHING off</h3>
-  <p>Press POWER on the Apple TV remote (outside off). Press POWER on the TV remote (inside off). Press the wall button (projector retracts).</p>
-</div>
-
-<div class="notes" style="margin-top:14px">
-  <strong>Why this works:</strong> The new AVR supports <em>independent zones</em> — the indoor signal chain (TV apps → eARC → AVR Main → house speakers) and the outdoor signal chain (Apple TV → AVR Zone 2 → porch speakers + projector) run in parallel inside the receiver without interfering. The same HDMI cable between TV and AVR that delivers the Apple TV picture indoors is also what carries the TV apps' audio back to the AVR via eARC. This is why we kept eARC enabled in the AVR settings even though the default mode never uses it — it's the load-bearing piece that makes the INDEPENDENT card work.
 </div>
 
 <h3 style="margin-top:24px">Wiring change from today</h3>
@@ -5476,7 +5503,7 @@ MUOFF          # Main zone unmuted</pre>
     <tr>
       <td>Porch speakers</td>
       <td>Denon main amp → manual zone button-box</td>
-      <td><strong>AVR-X2800H Zone 2 amp outputs</strong> (direct — button-box removed)</td>
+      <td><strong>AVR-X2800H Front B terminals</strong> (direct — button-box removed; Front A/B switched by <code>PSFRONT</code> Telnet command per wall-button state)</td>
     </tr>
     <tr>
       <td>AVR control</td>
@@ -5491,42 +5518,109 @@ MUOFF          # Main zone unmuted</pre>
   </tbody>
 </table>
 
-<h3 style="margin-top:24px">Failure-mode behavior</h3>
+<h3 style="margin-top:24px">Troubleshooting — what to try when something's off</h3>
+
+<p style="font-size:14px;color:var(--muted)">
+  Ordered from "most likely to fix it" downward. Try the phone app first for
+  anything AV-related — that's what the intent buttons are for. Physical
+  remotes are the fallback when the phone app is unreachable or the ESP32
+  itself is out of the picture.
+</p>
 
 <table>
   <thead>
     <tr>
-      <th>If this happens</th>
-      <th>What they do</th>
+      <th style="width:30%">If this happens</th>
+      <th>Try this, in order</th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <td>Apple TV remote dead / lost</td>
-      <td>AVR remote → Power → Input → pick source. Wall button still determines which display(s) it goes to.</td>
+      <td><strong>Picture on wrong screen, sound on wrong speakers, or Apple TV volume buttons stopped working</strong></td>
+      <td>
+        <ol style="margin:0;padding-left:18px">
+          <li>Open the phone app. Tap <strong>Re-sync AV</strong>. Wait 2 seconds. Most of the time this fixes it — the AVR just missed or fought a CEC command.</li>
+          <li>If picture/sound is still wrong, tap the intent button for what you actually want: <strong>Watch inside</strong>, <strong>Watch on projector</strong>, or <strong>Watch both</strong>. That declares a target state and re-sends every command from scratch.</li>
+          <li>Still wrong? Pick up the black Denon remote. Press <strong>POWER</strong>. Press the source button labeled <strong>CBL/SAT</strong> (that's the Apple TV input). Then go back to the phone app and tap <strong>Re-sync AV</strong> so the AVR's zone + speaker routing lines up with the box's current position.</li>
+        </ol>
+      </td>
     </tr>
     <tr>
-      <td>CEC misfires (wrong input selected)</td>
-      <td>AVR remote → Input button → pick correct one. Same recovery path as any AVR.</td>
+      <td><strong>Apple TV Siri Remote is dead or lost</strong></td>
+      <td>
+        <ol style="margin:0;padding-left:18px">
+          <li>Pick up the black Denon remote (the big one that came with the AVR). Press <strong>POWER</strong> — top-left corner.</li>
+          <li>Press the source button labeled <strong>CBL/SAT</strong> (top row) — that's the Apple TV input.</li>
+          <li>Whichever display is active (TV if the projector is up in the ceiling, projector if the box is down) will now show the Apple TV. Use the Sony TV remote or Denon volume rocker for volume.</li>
+          <li>Order a replacement Siri Remote when convenient. Everything works with just the Denon remote in the meantime; it's just less pleasant.</li>
+        </ol>
+      </td>
     </tr>
     <tr>
-      <td>Wall button stuck / ESP32 dead</td>
-      <td>AVR remote does everything manually. Worst case: projector doesn't deploy and they watch on TV.</td>
+      <td><strong>Wall button doesn't do anything</strong></td>
+      <td>
+        <ol style="margin:0;padding-left:18px">
+          <li>Open the phone app. Tap <strong>Watch inside</strong> or <strong>Watch on projector</strong> depending on where you're headed. If the app works, the wall button is the problem — likely a loose wire or the momentary switch failed. Note it and call Zach.</li>
+          <li>If the phone app also won't load (spinning forever, or "can't reach"), the ESP32 is offline. Reboot it: unplug the projector's box power cord from the ceiling outlet, count to 10, plug it back in. Give it a full minute to boot and rejoin WiFi. Try the phone app again.</li>
+          <li>If the ESP32 is still offline after a reboot, the projector will not deploy. Watch indoors: pick up the Sony TV remote, press <strong>HOME</strong>, pick an app. Call Zach when convenient.</li>
+        </ol>
+      </td>
     </tr>
     <tr>
-      <td>Power outage mid-cycle</td>
-      <td>ESP32 boots to CLOSED (fail-safe default — fans off, ENs LOW, PWM 0). If the box happens to be physically partway down, the next wall-button press reads endstops as "not deployed" ⇒ fires OPEN, which runs until both endstops trip and re-establishes a known position. If the box was already at the deployed endstops when power dropped, the press reads "deployed" ⇒ fires CLOSE. Either way the next press is the recovery.</td>
+      <td><strong>Power outage while the box was moving</strong></td>
+      <td>
+        <ol style="margin:0;padding-left:18px">
+          <li>Wait 30 seconds after power comes back for the ESP32 to boot and reconnect to WiFi.</li>
+          <li>Press the wall button once. The ESP32 reads its endstops and finishes moving to a known position — either fully deployed (projector down) or fully retracted (projector up).</li>
+          <li>If the box doesn't move at all after the wall press, open the phone app and tap the intent button for what you want. Same recovery, just from the phone.</li>
+        </ol>
+        <p style="margin:6px 0 0;font-size:12px;color:var(--muted)"><em>Under the hood:</em> the ESP32 boots to a fail-safe CLOSED state (fans off, motor enables LOW, PWM 0). The reconcile-from-endstops routine then reads the physical position and updates the state machine so the next command lands correctly. This is by design — safer than trying to resume mid-motion.</em></p>
+      </td>
     </tr>
     <tr>
-      <td>Network down (AVR Telnet unreachable)</td>
-      <td>Actuators + fans still cycle on wall button (local to ESP32). AVR/projector commands fail silently; they fall back to AVR remote.</td>
+      <td><strong>Box is stuck deployed and won't retract</strong></td>
+      <td>
+        <ol style="margin:0;padding-left:18px">
+          <li>Phone app → tap <strong>Watch inside</strong>. The box should start closing within 2 seconds.</li>
+          <li>If it doesn't move within 30 seconds, tap <strong>!! STOP — kill all motion</strong> in the Safety section at the very top of the app.</li>
+          <li>Scroll down to Diagnostics → tap <strong>Diag: reset to CLOSED</strong>. This tells the state machine to reset to a known baseline.</li>
+          <li>Try <strong>Watch inside</strong> again.</li>
+          <li>If it still won't retract, call Zach — likely an actuator, endstop, or wiring issue that needs eyes on it. Do not try to physically pull the box.</li>
+        </ol>
+      </td>
     </tr>
     <tr>
-      <td>Someone "fixes" the AVR settings</td>
-      <td>The Settings list above is the recovery checklist. Re-apply and the system is back to spec. Nothing weird or hidden — just default Denon options set the right way.</td>
+      <td><strong>Network is down (WiFi or router acting up)</strong></td>
+      <td>
+        <ol style="margin:0;padding-left:18px">
+          <li>The wall button still works — it's local to the ESP32 and doesn't need the network for actuators, fans, or the projector screen.</li>
+          <li>The AVR mode-switching (<code>PSFRONT</code>, <code>VSMONI</code>) and projector power (<code>PJLink</code>) commands are sent over the LAN, so those will silently fail while the network is down. The lift still moves; you just may need to fix the AVR side manually.</li>
+          <li>After pressing the wall button: if the sound/picture is on the wrong side, pick up the Denon remote → press <strong>POWER</strong>, then <strong>CBL/SAT</strong>. That gets you sound out of whichever speakers the AVR is currently routed to.</li>
+          <li>To turn the projector on manually (only needed if it didn't come on with the box): use the projector's own remote (Epson black remote, in the AV cabinet). Press its POWER button. Same for power off.</li>
+          <li>When the network is back, open the phone app and tap <strong>Re-sync AV</strong> — everything re-aligns.</li>
+        </ol>
+      </td>
+    </tr>
+    <tr>
+      <td><strong>Someone changed the AVR settings and things are weird</strong></td>
+      <td>
+        <ol style="margin:0;padding-left:18px">
+          <li>Try the phone app <strong>Re-sync AV</strong> button first. If the settings that got changed are ones the firmware sends over Telnet (input, speaker A/B, mute), re-sync fixes them.</li>
+          <li>If re-sync doesn't help, the changed setting is a menu-level one (Amp Assign, HDMI Control, Power Off Control). Re-apply from the Settings checklist above using the Denon remote: press <strong>SETUP</strong>, use arrow keys to navigate, save.</li>
+          <li>The critical one is <strong>Amp Assign → "5.1ch + Front B"</strong>. If that got flipped back to plain 5.1 or 7.1, the porch speakers stop working entirely. It's under Speakers → Manual Setup → Amp Assign.</li>
+          <li>If you're not comfortable in the AVR menus, call Zach and read the current menu values off the on-screen display; he'll walk you through the fix over the phone.</li>
+        </ol>
+      </td>
     </tr>
   </tbody>
 </table>
+
+<p style="font-size:13px;color:var(--muted);margin-top:12px;background:#fafaf9;padding:8px 10px;border-radius:5px">
+  <strong>When to just call Zach:</strong> hardware failure (box makes grinding
+  noises, burning smell, tripped breaker, physical damage), or anything above
+  where the checklist ends in "call Zach". Everything else is meant to be
+  self-serviceable from the phone or the Denon remote.
+</p>
 
 <h3 style="margin-top:24px">Firmware additions to the ESP32 (extends Section 10)</h3>
 
@@ -5601,7 +5695,7 @@ ESP32 in lift box
     │
     ├── Runs the IDENTICAL OPEN sequence as the wall button:
     │   1. PJLink → projector ON
-    │   2. AVR Telnet → VSMONI2 + MUON + Z2SOURCE + Z2ON
+    │   2. AVR Telnet → VSMONI2 + PSFRONT SPB + MSSTEREO + MUOFF
     │   3. GPIO 17 fan PWM → fans on (via fan-driver MOSFET)
     │   4. Actuators → drive UP
     │
@@ -5624,7 +5718,7 @@ Wall button state model stays in sync
     </tr>
     <tr>
       <td>"Alexa, turn off the projector"</td>
-      <td>Fires the CLOSE sequence — Zone 2 off, projector cooldown, actuators retract, fan continues 30-min post-close cooldown. Identical to wall button CLOSE.</td>
+      <td>Fires the CLOSE sequence — AVR restored to indoor (VSMONI1 + PSFRONT SPA + MSMOVIE), projector cooldown, actuators retract, fan continues 30-min post-close cooldown. Identical to wall button CLOSE.</td>
     </tr>
     <tr>
       <td>"Alexa, is the projector on?"</td>
@@ -5654,7 +5748,7 @@ Wall button state model stays in sync
   <ul>
     <li>Already broadcasting an HA-discoverable API — no extra config needed</li>
     <li>Expose the projector as a single <code>cover</code> entity (open/close) — same entity HA already uses for the wall-button state</li>
-    <li>Optionally expose <code>switch</code> entities for individual building blocks (Zone 2, fan, etc.) — not required for the basic voice command</li>
+    <li>Optionally expose <code>switch</code> entities for individual building blocks (fan, screen relay, etc.) — not required for the basic voice command</li>
   </ul>
 </div>
 
@@ -5747,9 +5841,9 @@ Wall button state model stays in sync
   <li>BOM fully linked: every line item has an Amazon URL + exact price in the Purchase Summary at top</li>
   <li>Wiring sketch + block diagram: section 9</li>
   <li>Firmware target: ESPHome (cover components for actuators, fan PWM via <code>output</code> on GPIO 17, switch for screen-relay BC547 drive on GPIO 16, endstop binary_sensors on GPIO 22 + 23)</li>
-  <li><strong>AV chain rebuild scoped (Section 12):</strong> Denon AVR-X2800H replaces 2013 AVR-X2000 + HDMI splitter (Out 2 to projector eliminates splitter, Zone 2 amp eliminates manual button-box); Apple TV 4K Gen 3 replaces 2013 A1469; Harmony Hub + IR repeater retired in favor of HDMI-CEC + Telnet from lift ESP32</li>
+  <li><strong>AV chain rebuild scoped (Section 12):</strong> Denon AVR-X2800H replaces 2013 AVR-X2000 + HDMI splitter (Out 2 to projector eliminates splitter, Front A/B switching under "5.1ch + Front B" amp assign eliminates manual button-box); Apple TV 4K Gen 3 replaces 2013 A1469; Harmony Hub + IR repeater retired in favor of HDMI-CEC + Telnet from lift ESP32</li>
   <li><strong>AVR specifically locked (Section 11):</strong> Denon AVR-X2800H Factory Certified Refurbished ($999.50, Amazon B0C5S64TVN) chosen over new X2800H ($1,170–1,299) and new X2900H successor ($1,349). Same Telnet API across generations so firmware design is portable. Fallback if refurb stock dries up: jump to new X2900H, not new X2800H.</li>
-  <li><strong>State machine locked:</strong> wall button = INDOOR/OUTDOOR mode lever; Apple TV remote power button handles wake/sleep within current mode; BOTH mode auto-detected when TV wakes during OUTDOOR with same Apple TV content; <strong>INDEPENDENT mode added 2026-06-09</strong> — TV apps via eARC + Apple TV via Zone 2 simultaneously, documented as Card 2 occasional-use path</li>
+  <li><strong>State machine locked:</strong> wall button = INDOOR/OUTDOOR mode lever driving <code>PSFRONT SPA</code> vs <code>SPB</code> at the AVR; Apple TV remote power button handles wake/sleep within current mode; BOTH mode (same source everywhere via <code>PSFRONT A+B</code>) is a manual override via the Diag button. <em>INDEPENDENT mode retired 2026-07-05</em> — required Zone 2 as a truly independent source path, incompatible with the Front A/B topology.</li>
   <li><strong>Single-source rule:</strong> Apple TV is the only source; Sony TV built-in apps not used; optical TV→AVR cable removed</li>
   <li><strong>All AV cabling reused (2026-06-09):</strong> existing 50 ft HDMI 2.0 Denon→projector (4× headroom over WUXGA60), existing TV-Denon HDMI cable, Cat5e for projector PJLink from Zach's on-hand stock. ESP32 is Wi-Fi so no Ethernet drop in box.</li>
   <li><strong>Alexa voice control via Path 1 (Section 13):</strong> HA Green ($99) at parents' provides the Alexa→ESP32 bridge locally. "Alexa, turn on the projector" fires the same OPEN sequence as the wall button. Path 2 (cross-site via arria) rejected on the experts-dismantle-it rule; Path 3 (ESPHome Hue emulation) kept as no-HA fallback.</li>
@@ -5774,11 +5868,11 @@ Wall button state model stays in sync
   <li><strong>Home Assistant integration</strong> — once ESPHome is talking, expose the box (open/closed/moving) + button + fan state to HA for any future automation (e.g., "if Plex starts playing, open the box").</li>
   <li><strong>Order AV chain parts</strong> — Denon AVR-X2800H Refurb ($999.50, Amazon B0C5S64TVN) + Apple TV 4K Gen 3 128 GB ($149). <strong>All cabling reused</strong>: 50 ft Denon→projector HDMI + short Sony→Denon HDMI (re-terminated to the new AVR's two outputs) + Cat5e pulled from Zach's on-hand stock for the projector PJLink run. <strong>HA Green for Alexa (Section 13) is ordered via the parents' smart home doc</strong>, not this BOM.</li>
   <li><strong>Set up HA Green + Alexa integration (Section 13)</strong> — once Dad orders HA Green from the smart home doc: plug into parents' router, run onboarding wizard, enable Nabu Casa Cloud subscription ($65/yr), expose the projector ESP32 cover entity to Alexa, verify "Alexa, turn on the projector" fires the OPEN sequence end-to-end.</li>
-  <li><strong>Re-terminate speaker runs</strong> — house speakers to AVR Main amp outputs, porch speakers <strong>directly</strong> to AVR Zone 2 amp outputs (manual zone button-box gets unplugged and removed from the rack).</li>
+  <li><strong>Re-terminate speaker runs</strong> — indoor 5.1 to AVR <strong>Front A + Center + Surround + Sub</strong> terminals; porch stereo pair <strong>directly</strong> to AVR <strong>Front B</strong> terminals (manual zone button-box gets unplugged and removed from the rack).</li>
   <li><strong>Pull Cat5e through the existing projector conduit</strong> — the 50 ft HDMI stays in place. Use any pull-string already in the conduit, or tape the Cat5e to the HDMI and pull it through alongside (carefully — don't dislodge the HDMI termination at the projector end).</li>
-  <li><strong>Configure devices per Section 12 settings checklist</strong> — Sony TV (auto-wake on HDMI OFF), Apple TV (Control TVs and Receivers ON), Denon AVR-X2800H (HDMI Control + Power Off Control All + Zone 2 Source SOURCE + Zone 2 HDMI ON + DHCP reservation). Save the checklist for re-application if anyone "fixes" it later.</li>
+  <li><strong>Configure devices per Section 12 settings checklist</strong> — Sony TV (auto-wake on HDMI OFF), Apple TV (Control TVs and Receivers ON), Denon AVR-X2800H (HDMI Control + Power Off Control All + Amp Assign "5.1ch + Front B" + PJLink-target DHCP reservation on projector). Save the checklist for re-application if anyone "fixes" it later.</li>
   <li><strong>Extend ESPHome firmware</strong> — Telnet client for AVR mode commands, PJLink client for projector power on/off, AVR monitor-state polling for BOTH-mode auto-detect, boot-time reconciliation.</li>
-  <li><strong>Print and laminate the two occasional-use cards</strong> from Section 12 (Card 1: same content both sides · Card 2: different content both sides) — keep them near the TV.</li>
+  <li><strong>Print and laminate the occasional-use card</strong> from Section 12 (Card 1: same content playing both sides at once) — keep it near the TV.</li>
   <li><strong>Decommission removed gear</strong> — Denon AVR-X2000, Avedio HDMI splitter, Apple TV A1469, manual zone button-box, Harmony Hub + IR repeater, optical TV→AVR cable.</li>
 </ul>
 
